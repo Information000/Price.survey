@@ -166,10 +166,10 @@ tr.lowrow td{background:color-mix(in srgb,var(--bad) 7%,transparent)}
       <div class="note">写真は自動で明るさ・輪郭を補正し、札ごと・区画ごとに拡大して何度も読み取ります。同じ札を複数回読んだ結果を多数決でまとめ、一致しなかったものは「要確認」にします。</div>
 
       <div class="apikey" id="apiBox" hidden>
-        <label class="f">Anthropic APIキー（このHTMLを単体で開いた場合のみ必要）
-          <input id="apiKey" type="password" placeholder="sk-ant-..." autocomplete="off">
+        <div class="note"><b>無料モードで動いています。</b>この端末の中で文字を認識するので費用はかかりません。初回だけ文字データ（数MB）を読み込みます。AIで読む高精度モードより読み間違いが多いので、台帳の赤い行は写真と見比べて直してください。</div>
+        <label class="f">高精度モードを使う場合のみ：Anthropic APIキー（有料）
+          <input id="apiKey" type="password" placeholder="空欄なら無料モード" autocomplete="off">
         </label>
-        <div class="note">キーはこのブラウザの中だけに保存されます。社内配布時はキーの管理ルールに従ってください。</div>
       </div>
 
       <button class="primary" id="runBtn" disabled>写真を読み取って台帳に追加</button>
@@ -381,14 +381,19 @@ async function initEngine(){
         dot.className = "dot ok"; txt.textContent = "Claudeで読み取り（あなたのClaude利用枠を使います）"; updateRun(); return; }
     }
   }
-  // 単体のHTMLとして開いた場合：APIキーで直接読み取り
-  state.engine = { kind:"api", maxCount: 20 };
+  // 単体のHTMLとして開いた場合：無料モード（端末内の文字認識）。APIキーが入っていればそちらを使う
   $("apiBox").hidden = false;
   const k = load(KEY_KEY); if (k) $("apiKey").value = k;
-  dot.className = "dot warn"; txt.textContent = "APIキーで読み取り（単体モード）";
-  updateRun();
+  setStandaloneEngine();
 }
 
+function setStandaloneEngine(){
+  const hasKey = !!$("apiKey").value.trim();
+  state.engine = { kind: hasKey ? "api" : "free", maxCount: 20 };
+  $("engineDot").className = "dot " + (hasKey ? "ok" : "warn");
+  $("engineText").textContent = hasKey ? "高精度モード（APIキー・有料）" : "無料モード（この端末で文字認識）";
+  updateRun();
+}
 async function askJSON(prompt, blobs, signal){
   if (state.engine.kind === "claude")
     return state.sample.json(prompt, { images: blobs, signal });
@@ -407,11 +412,12 @@ async function askJSON(prompt, blobs, signal){
   const m = text.match(/\{[\s\S]*\}/); if (!m) throw { code:"invalid_json", message:"結果を読み取れませんでした" };
   return JSON.parse(m[0]);
 }
-const FATAL = ["cancelled","not_granted","no_key","http_401","sampling_disabled","session_expired"];
+const FATAL = ["cancelled","not_granted","no_key","http_401","sampling_disabled","session_expired","ocr_load"];
 
 // 写真1枚の読み取り：①札の位置を探す ②札ごとに切り出して拡大・補正 ③写真全体も細かい区画に分けて拡大・補正
 // ④すべての画像を読み、同じ札を何度も読んだ結果を多数決でまとめる
 async function extract(photo, ctx, signal, onPartial = () => {}){
+  if (state.engine.kind === "free") return extractFree(photo, ctx, signal, onPartial);
   const img = photo.img, W = img.naturalWidth, H = img.naturalHeight;
   // 小さめの写真は区画を1段細かくし、拡大の上限も上げる
   const n = Math.min(6, (Number($("density").value) || 4) + (photo.low ? 1 : 0));
@@ -462,6 +468,127 @@ async function extract(photo, ctx, signal, onPartial = () => {}){
   if (!entries.length && failed) throw lastErr;
   photo.readCount = jobs.length;
   return mergeEntries(entries, ctx);
+}
+
+/* ================= 無料モード：この端末の中で文字認識（Tesseract.js） ================= */
+const MAKERS = [[/HITACHI|日立/, "日立"], [/PANASONIC|パナソニック/, "パナソニック"], [/SHARP|シャープ/, "シャープ"], [/DAIKIN|ダイキン/, "ダイキン"],
+  [/TOSHIBA|東芝/, "東芝"], [/MITSUBISHI|三菱/, "三菱電機"], [/SONY|ソニー/, "ソニー"], [/FUJITSU|富士通/, "富士通"], [/CORONA|コロナ/, "コロナ"],
+  [/AQUA|アクア/, "AQUA"], [/HISENSE|ハイセンス/, "ハイセンス"], [/TCL/, "TCL"], [/LG/, "LG"], [/IRIS|アイリス/, "アイリスオーヤマ"],
+  [/ZOJIRUSHI|象印/, "象印"], [/TIGER|タイガー/, "タイガー"], [/BRAUN|ブラウン/, "ブラウン"], [/PHILIPS|フィリップス/, "フィリップス"],
+  [/DYSON|ダイソン/, "ダイソン"], [/CANON|キヤノン/, "キヤノン"], [/EPSON|エプソン/, "エプソン"], [/BROTHER|ブラザー/, "ブラザー"],
+  [/NEC/, "NEC"], [/LENOVO|レノボ/, "レノボ"], [/DYNABOOK/, "dynabook"], [/APPLE|アップル/, "Apple"], [/ASUS/, "ASUS"], [/HP/, "HP"], [/DELL/, "Dell"],
+  [/BALMUDA|バルミューダ/, "バルミューダ"], [/SALONIA|サロニア/, "サロニア"], [/REFA|リファ/, "ReFa"]];
+let tessWorker = null;
+function loadScript(src){
+  return new Promise((res, rej) => { const s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = () => rej({ code: "ocr_load", message: "文字認識の部品を読み込めませんでした" }); document.head.appendChild(s); });
+}
+async function getTess(photo){
+  if (!window.Tesseract){
+    setPhase(photo, "文字認識の部品を読み込んでいます（初回のみ）", 0);
+    await loadScript("https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js");
+  }
+  if (!tessWorker){
+    setPhase(photo, "日本語の文字データを読み込んでいます（初回のみ・数十秒）", 0);
+    tessWorker = await Tesseract.createWorker(["jpn", "eng"]);
+    await tessWorker.setParameters({ tessedit_pageseg_mode: "11", preserve_interword_spaces: "1" });   // 11＝あちこちに散らばった文字を探す
+  }
+  return tessWorker;
+}
+// 切り出して拡大・補正したキャンバスを返す
+function cropCanvas(img, sx, sy, sw, sh, targetPx, maxUp){
+  sx = Math.max(0, Math.round(sx)); sy = Math.max(0, Math.round(sy));
+  sw = Math.max(8, Math.min(img.naturalWidth - sx, Math.round(sw))); sh = Math.max(8, Math.min(img.naturalHeight - sy, Math.round(sh)));
+  const s = Math.min(maxUp, Math.sqrt(targetPx / (sw * sh)));
+  const c = document.createElement("canvas"); c.width = Math.max(1, Math.round(sw * s)); c.height = Math.max(1, Math.round(sh * s));
+  const g = c.getContext("2d", { willReadFrequently: true }); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = "high";
+  g.drawImage(img, sx, sy, sw, sh, 0, 0, c.width, c.height);
+  try { enhance(g, c.width, c.height); } catch(e){}
+  return c;
+}
+function ocrLines(data){
+  if (data.lines && data.lines.length) return data.lines;
+  const out = [];
+  for (const b of data.blocks || []) for (const p of b.paragraphs || []) for (const l of p.lines || []) out.push(l);
+  return out;
+}
+// 1区画の文字認識結果から「型番・価格・期間」を拾い、近いもの同士を組み合わせる
+function parseOCR(lines, W, H){
+  const models = [], prices = [], periods = [], makers = [], specs = [];
+  // 工事費・ポイントなどの説明がある行の位置（その近くの金額は商品価格として使わない）
+  const feeBoxes = lines.filter(l => /工事|取付|まで|以上|ポイント|下取|補助/.test(String(l.text || "").normalize("NFKC"))).map(l => l.bbox);
+  const nearFee = (b) => feeBoxes.some(f => { const h = Math.max(f.y1 - f.y0, b.y1 - b.y0);
+    return b.y0 >= f.y0 - h && b.y0 - f.y1 < h * 2.5 && Math.min(b.x1, f.x1) - Math.max(b.x0, f.x0) > -h; });
+  for (const l of lines){
+    const b = l.bbox, t = String(l.text || "").normalize("NFKC").trim();
+    if (!t) continue;
+    const cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2, h = Math.max(1, b.y1 - b.y0);
+    const compact = t.replace(/\s+/g, "").toUpperCase();
+    for (const m of compact.matchAll(/[A-Z]{1,5}[0-9]?-[A-Z0-9]{3,12}(?:-[A-Z0-9]{1,6})?(?:\/[A-Z])?(?:\([A-Z0-9]{1,3}\))?/g)){
+      const s = m[0];
+      if (s.length >= 6 && s.length <= 22 && /\d/.test(s.split("-")[1] || "")) models.push({ s, cx, cy });
+    }
+    const isFee = /工事|まで|以上|KW|ポイント|PT|下取|補助/.test(compact) || nearFee(b);
+    // 「307,780」「307.780」「307 780」「307, 780」をすべて同じ金額として読む
+    for (const m of t.matchAll(/(?<![\d.,])(\d{1,3}(?:[,.] ?\d{3}|  ?\d{3})+|\d{4,7})(?![\d])/g)){
+      const v = Number(m[1].replace(/[,. ]/g, ""));
+      const plain = /^\d+$/.test(m[1]);
+      if (plain && v < 10000) continue;   // 区切りのない4桁はスペック表の数字のことが多い
+      if (v >= 1000 && v <= 5000000) prices.push({ v, cx, cy, h, fee: isFee, tax: /税込|込/.test(t) ? "in" : /税別|税抜|別/.test(t) ? "ex" : null });
+    }
+    const pm = t.match(/(\d{1,2})\s*\/\s*(\d{1,2})\D{0,8}[〜~\-ー―～]\D{0,4}?(\d{1,2})\s*\/\s*(\d{1,2})/);
+    if (pm) periods.push({ s: `${pm[1]}/${pm[2]}〜${pm[3]}/${pm[4]}`, cx, cy });
+    for (const [re, name] of MAKERS) if (re.test(compact)) { makers.push({ name, cx, cy }); break; }
+    const sp = t.match(/(\d{1,2})\s*畳/) || t.match(/(\d{2,3})\s*型/) || t.match(/(\d{2,3})\s*L\b/);
+    if (sp) specs.push({ s: sp[0].replace(/\s/g, ""), cx, cy });
+  }
+  const diag = Math.hypot(W, H), reach = diag * 0.35;
+  const dist = (a, b, penBelow = 1) => Math.hypot(a.cx - b.cx, (a.cy - b.cy) * ((b.cy > a.cy) ? penBelow : 1));
+  const nearest = (from, list, max, penBelow) => { let best = null, bd = max; for (const x of list){ const d = dist(from, x, penBelow); if (d < bd){ bd = d; best = x; } } return best; };
+
+  // 値札の価格は大きな文字で書かれている。小さな文字だけの組み合わせは使わない
+  const hs = lines.map(l => l.bbox.y1 - l.bbox.y0).sort((a, b) => a - b), medH = hs[Math.floor(hs.length / 2)] || 1;
+  // 税抜×1.1＝税込 になる2つの数字を「1つの価格」として組み合わせる
+  const pairs = [];
+  for (const a of prices) for (const c of prices){
+    if (a === c || a.v >= c.v) continue;
+    if (Math.max(a.h, c.h) < medH * 1.3) continue;
+    if (Math.abs(Math.floor(a.v * 1.1) - c.v) <= 2){ const d = Math.hypot(a.cx - c.cx, a.cy - c.cy); if (d < Math.max(a.h, c.h) * 8) pairs.push({ ex: a, inc: c, d }); }
+  }
+  pairs.sort((x, y) => x.d - y.d);
+  const used = new Set(), records = [];
+  for (const p of pairs){ if (used.has(p.ex) || used.has(p.inc)) continue; used.add(p.ex); used.add(p.inc);
+    records.push({ price_ex: p.ex.v, price_in: p.inc.v, cx: (p.ex.cx + p.inc.cx) / 2, cy: (p.ex.cy + p.inc.cy) / 2, confidence: "medium" }); }
+  // 片方しか読めなかった価格は「税込」「税別」の文字があるときだけ使う
+  for (const p of prices){ if (used.has(p) || p.fee || !p.tax || p.v < 3000) continue;
+    records.push({ price_ex: p.tax === "ex" ? p.v : null, price_in: p.tax === "in" ? p.v : null, cx: p.cx, cy: p.cy, confidence: "low" }); }
+
+  const entries = [];
+  for (const r of records){
+    const m = nearest(r, models, reach, 1.6), per = nearest(r, periods, reach * 0.8), mk = nearest(r, makers, reach);
+    entries.push({ kind: per ? "期間特価" : "店頭価格", model: m ? m.s : null, maker: mk ? mk.name : "", period: per ? per.s : "",
+      price_ex: r.price_ex, price_in: r.price_in, confidence: m ? r.confidence : "low" });
+  }
+  for (const sp of specs){ const m = nearest(sp, models, reach); if (m) entries.push({ kind: "スペックのみ", model: m.s, spec: sp.s }); }
+  return entries;
+}
+async function extractFree(photo, ctx, signal, onPartial){
+  const img = photo.img, W = img.naturalWidth, H = img.naturalHeight;
+  const worker = await getTess(photo);
+  const n = Math.min(6, (Number($("density").value) || 4) - 1 + (photo.low ? 1 : 0));   // 端末の処理が重いので1段軽くする
+  const ov = 0.35, tw = W / (n - (n - 1) * ov), th = H / (n - (n - 1) * ov);
+  const tiles = [];
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) tiles.push([(W - tw) * (n === 1 ? 0 : x / (n - 1)), (H - th) * (n === 1 ? 0 : y / (n - 1))]);
+  const entries = [];
+  for (let i = 0; i < tiles.length; i++){
+    if (signal.aborted) throw { code: "cancelled" };
+    setPhase(photo, `この端末で文字を読んでいます（${i + 1}/${tiles.length}区画）`, i / tiles.length);
+    const c = cropCanvas(img, tiles[i][0], tiles[i][1], tw, th, 2400000, photo.low ? 4 : 3);
+    const { data } = await worker.recognize(c);
+    parseOCR(ocrLines(data), c.width, c.height).forEach(e => entries.push(e));
+    if (entries.length) onPartial(mergeEntries(entries.map(x => ({ ...x })), ctx).filter(r => r.model));
+  }
+  photo.readCount = tiles.length;
+  return mergeEntries(entries, ctx).filter(r => r.model);   // 無料モードは型番の読めた行だけ台帳に入れる
 }
 
 /* ================= 多数決でまとめる ================= */
@@ -557,7 +684,8 @@ function errText(e){
     invalid_json:"読み取り結果の形式が崩れました。もう一度お試しください。",
     refused:"この写真は読み取れませんでした。",
     no_key:"APIキーを入力してください。", http_401:"APIキーが正しくありません。",
-    cancelled:"中止しました。"
+    cancelled:"中止しました。",
+    ocr_load:"文字認識の部品を読み込めませんでした。インターネットにつながっているか確認して、もう一度お試しください。"
   };
   return map[c] || ("読み取りに失敗しました（" + (c || (e && e.message) || "不明") + "）。もう一度お試しください。");
 }
@@ -863,6 +991,7 @@ $("clearBtn").addEventListener("click", () => {
   $("clearYes").onclick = () => { state.ledger = []; saveLedger(); renderLedger(); resetClear(); toast("台帳を削除しました"); };
 });
 function resetClear(){ $("clearArea").innerHTML = `<button class="link" id="clearBtn2">台帳をすべて削除</button>`; $("clearBtn2").onclick = () => $("clearBtn").click(); }
+$("apiKey").addEventListener("input", () => { if (state.engine && state.engine.kind !== "claude") setStandaloneEngine(); });
 $("competitor").addEventListener("change", () => store("cps-competitor", $("competitor").value));
 $("store").addEventListener("change", () => store("cps-store", $("store").value));
 
