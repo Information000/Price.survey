@@ -181,7 +181,8 @@ tr.lowrow td{background:color-mix(in srgb,var(--bad) 7%,transparent)}
         <select id="fCat" aria-label="カテゴリで絞り込み"><option value="">全カテゴリ</option></select>
         <select id="fComp" aria-label="競合店で絞り込み"><option value="">全競合店</option></select>
         <input id="fText" type="search" placeholder="型番・メーカーで検索" aria-label="検索">
-        <button class="tagbtn" id="csvBtn">CSVで書き出し</button>
+        <button class="tagbtn" id="xlsxBtn">Excelで書き出し</button>
+        <button id="csvBtn">CSV</button>
         <button id="jsonBtn">バックアップ(JSON)</button>
         <button id="importBtn">読み込み</button>
         <input type="file" id="importFile" accept=".json,application/json" hidden>
@@ -203,6 +204,7 @@ tr.lowrow td{background:color-mix(in srgb,var(--bad) 7%,transparent)}
   </section>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script>
 "use strict";
 /* ================= 設定 ================= */
@@ -498,6 +500,99 @@ async function saveFile(filename, text, mime){
 }
 const stamp = () => new Date().toISOString().slice(0,10).replace(/-/g,"");
 
+/* ================= Excel書き出し ================= */
+const XL = { head:"FF1D3F9E", headInk:"FFFFFFFF", tag:"FFFFD83A", low:"FFFDE4E1", band:"FFF3F5F9", line:"FFD9DEE6" };
+const YEN_FMT = '"¥"#,##0';
+function styleHeader(ws){
+  const h = ws.getRow(1);
+  h.font = { bold:true, color:{ argb: XL.headInk }, name:"游ゴシック" };
+  h.fill = { type:"pattern", pattern:"solid", fgColor:{ argb: XL.head } };
+  h.alignment = { vertical:"middle", horizontal:"center", wrapText:true };
+  h.height = 30;
+  ws.views = [{ state:"frozen", ySplit:1 }];
+  ws.autoFilter = { from:{ row:1, column:1 }, to:{ row:1, column: ws.columnCount } };
+}
+function borderAll(ws){
+  ws.eachRow(row => row.eachCell({ includeEmpty:true }, c => {
+    c.border = { top:{style:"thin",color:{argb:XL.line}}, bottom:{style:"thin",color:{argb:XL.line}}, left:{style:"thin",color:{argb:XL.line}}, right:{style:"thin",color:{argb:XL.line}} };
+  }));
+}
+async function buildWorkbook(rows){
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "競合価格調査シート"; wb.created = new Date();
+
+  // シート1：調査台帳（全項目）
+  const ws = wb.addWorksheet("調査台帳");
+  const widths = { date:11, competitor:13, store:12, category:11, maker:10, model:18, name:20, year:12, spec:22, price_ex:13, price_in:13, sale_ex:13, sale_in:13, street_in:14, sale_period:18, install:14, warranty:14, perks:24, note:18, confidence:8, photo:18 };
+  ws.columns = CSV_COLS.map(([k,l]) => ({ header:l, key:k, width: widths[k] || 12 }));
+  const money = ["price_ex","price_in","sale_ex","sale_in","street_in"];
+  const confJa = { high:"高", medium:"中", low:"低" };
+  rows.forEach((r, i) => {
+    const row = ws.addRow({ ...r, date: r.date ? new Date(r.date + "T00:00:00") : "", confidence: confJa[r.confidence] || "中" });
+    money.forEach(k => { const c = row.getCell(k); c.numFmt = YEN_FMT; c.alignment = { horizontal:"right" }; });
+    row.getCell("date").numFmt = "yyyy/mm/dd";
+    row.getCell("street_in").font = { bold:true };
+    row.getCell("street_in").fill = { type:"pattern", pattern:"solid", fgColor:{ argb: XL.tag } };
+    if (r.confidence === "low") row.eachCell({ includeEmpty:true }, (c, n) => { if (n !== ws.getColumn("street_in").number) c.fill = { type:"pattern", pattern:"solid", fgColor:{ argb: XL.low } }; });
+    else if (i % 2) row.eachCell({ includeEmpty:true }, (c, n) => { if (n !== ws.getColumn("street_in").number) c.fill = { type:"pattern", pattern:"solid", fgColor:{ argb: XL.band } }; });
+  });
+  styleHeader(ws); borderAll(ws);
+
+  // シート2：型番別比較（競合店ごとの実売価格を横に並べる）
+  const comps = [...new Set(rows.map(r => r.competitor).filter(Boolean))];
+  const byModel = new Map();
+  rows.forEach(r => {
+    const key = (r.model || "").replace(/\s/g,"").toUpperCase(); if (!key || !r.street_in) return;
+    const m = byModel.get(key) || { category:r.category, maker:r.maker, model:r.model, spec:r.spec, prices:{}, dates:{} };
+    const prev = m.prices[r.competitor];
+    // 同じ店で複数回調査した場合は新しい日付を採用
+    if (prev == null || (r.date||"") >= (m.dates[r.competitor]||"")){ m.prices[r.competitor] = r.street_in; m.dates[r.competitor] = r.date || ""; }
+    byModel.set(key, m);
+  });
+  const cmp = wb.addWorksheet("型番別比較");
+  cmp.columns = [
+    { header:"カテゴリ", key:"category", width:11 }, { header:"メーカー", key:"maker", width:10 }, { header:"型番", key:"model", width:18 }, { header:"主要スペック", key:"spec", width:22 },
+    ...comps.map(c => ({ header:c + "\n実売(税込)", key:"c_" + c, width:15 })),
+    { header:"最安値(税込)", key:"min", width:14 }, { header:"最安店", key:"minStore", width:14 }, { header:"最高値との差", key:"diff", width:13 }
+  ];
+  [...byModel.values()].sort((a,b) => (a.category||"").localeCompare(b.category||"") || (a.model||"").localeCompare(b.model||"")).forEach(m => {
+    const vals = comps.map(c => m.prices[c]).filter(v => v != null);
+    const min = Math.min(...vals), max = Math.max(...vals);
+    const minStore = comps.filter(c => m.prices[c] === min).join("・");
+    const data = { category:m.category, maker:m.maker, model:m.model, spec:m.spec, min, minStore, diff: max - min };
+    comps.forEach(c => { data["c_" + c] = m.prices[c] ?? null; });
+    const row = cmp.addRow(data);
+    comps.forEach(c => { const cell = row.getCell("c_" + c); cell.numFmt = YEN_FMT;
+      if (m.prices[c] === min && vals.length > 1) cell.fill = { type:"pattern", pattern:"solid", fgColor:{ argb: XL.tag } }; });
+    ["min","diff"].forEach(k => row.getCell(k).numFmt = YEN_FMT);
+    row.getCell("min").font = { bold:true };
+  });
+  styleHeader(cmp); cmp.getRow(1).height = 36; borderAll(cmp);
+
+  // シート3：調査条件
+  const info = wb.addWorksheet("出力情報");
+  info.columns = [{ header:"項目", key:"k", width:16 }, { header:"内容", key:"v", width:48 }];
+  [["出力日時", new Date().toLocaleString("ja-JP")], ["件数", rows.length], ["競合店", comps.join("、")],
+   ["絞り込み", [$("fCat").value || "全カテゴリ", $("fComp").value || "全競合店", $("fText").value].filter(Boolean).join(" / ")],
+   ["実売価格", "表示価格(税込)と特価(税込)の安い方"], ["信頼度「低」", "調査台帳シートで薄い赤の行。写真で確認してください"]
+  ].forEach(([k,v]) => info.addRow({ k, v }));
+  styleHeader(info); info.autoFilter = undefined; borderAll(info);
+
+  return wb;
+}
+async function exportXlsx(){
+  const rows = filtered().filter(r => !r.example);
+  if (!rows.length){ toast("書き出す行がありません"); return; }
+  if (typeof ExcelJS === "undefined"){ toast("Excel出力の部品を読み込めませんでした。CSVをお使いください"); return; }
+  const btn = $("xlsxBtn"); btn.disabled = true; const label = btn.textContent; btn.innerHTML = '<span class="spinner"></span> 作成中…';
+  try {
+    const wb = await buildWorkbook(rows);
+    const buf = await wb.xlsx.writeBuffer();
+    await saveFile(`競合価格調査_${stamp()}.xlsx`, new Blob([buf], { type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  } catch(e){ toast("Excelファイルを作れませんでした"); console.error(e); }
+  finally { btn.disabled = false; btn.textContent = label; }
+}
+
 /* ================= イベント ================= */
 const drop = $("drop"), fileInput = $("file");
 drop.addEventListener("click", () => fileInput.click());
@@ -532,6 +627,7 @@ $("results").addEventListener("click", e => {
 ["fCat","fComp","fText"].forEach(id => $(id).addEventListener("input", renderLedger));
 $("ledgerBody").addEventListener("click", e => { const id = e.target.dataset.ldel; if (!id) return;
   state.ledger = state.ledger.filter(r => r.id !== id); saveLedger(); renderLedger(); });
+$("xlsxBtn").addEventListener("click", exportXlsx);
 $("csvBtn").addEventListener("click", () => { const rows = filtered().filter(r => !r.example);
   if (!rows.length){ toast("書き出す行がありません"); return; }
   saveFile(`競合価格調査_${stamp()}.csv`, toCSV(rows), "text/csv"); });
