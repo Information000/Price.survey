@@ -1,0 +1,576 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>競合価格調査シート</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=Zen+Kaku+Gothic+New:wght@700;900&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: 左に「調査情報＋写真投入」、右に「読み取り結果の確認」。下段は調査台帳（売場の値札を集めた帳票）。 */
+:root{
+  --paper:#f6f7f9; --card:#ffffff; --ink:#18202e; --muted:#5b6575; --line:#d9dee6;
+  --accent:#1d3f9e; --accent-ink:#ffffff; --tag:#ffd83a; --tag-ink:#1b1b1b;
+  --good:#1f7a4d; --warn:#a86500; --bad:#b3261e; --soft:#eef1f6;
+  --f-display:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",sans-serif;
+  --f-body:"BIZ UDPGothic","Hiragino Sans","Yu Gothic","Meiryo",sans-serif;
+  --f-num:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --paper:#12161d; --card:#1a2029; --ink:#e7ebf2; --muted:#9aa4b4; --line:#2f3743;
+  --accent:#7d9cff; --accent-ink:#0d1220; --tag:#e8c22a; --tag-ink:#141414;
+  --good:#5fc993; --warn:#e3a646; --bad:#ff8a80; --soft:#222a35; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#12161d; --card:#1a2029; --ink:#e7ebf2; --muted:#9aa4b4; --line:#2f3743;
+  --accent:#7d9cff; --accent-ink:#0d1220; --tag:#e8c22a; --tag-ink:#141414;
+  --good:#5fc993; --warn:#e3a646; --bad:#ff8a80; --soft:#222a35; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.6;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px}
+.wrap{max-width:1280px;margin:0 auto;display:grid;gap:20px}
+h1,h2,h3{font-family:var(--f-display);margin:0;text-wrap:balance;line-height:1.3}
+h1{font-size:1.6rem;font-weight:900;letter-spacing:.02em}
+h2{font-size:1.1rem;font-weight:700}
+.num{font-family:var(--f-num);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.small{font-size:12px}
+header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+.top .sub{color:var(--muted);margin-top:4px}
+.engine{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border:1px solid var(--line);border-radius:999px;background:var(--card);font-size:12px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.dot.ok{background:var(--good)} .dot.warn{background:var(--warn)} .dot.bad{background:var(--bad)}
+
+.grid2{display:grid;grid-template-columns:minmax(0,360px) minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:900px){.grid2{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;display:grid;gap:14px;min-width:0}
+.panel-head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+label.f{display:grid;gap:4px;font-size:12px;color:var(--muted)}
+input,select,textarea{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:6px;padding:7px 9px;min-width:0;width:100%}
+input:focus-visible,select:focus-visible,button:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.drop{border:2px dashed var(--line);border-radius:10px;padding:18px;text-align:center;cursor:pointer;background:var(--soft);display:grid;gap:6px;justify-items:center}
+.drop.over{border-color:var(--accent)}
+.drop strong{font-family:var(--f-display)}
+.thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:8px}
+.thumb{position:relative;aspect-ratio:3/4;border-radius:6px;overflow:hidden;border:1px solid var(--line);max-width:100%}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.thumb .st{position:absolute;inset:auto 0 0 0;font-size:11px;padding:2px 4px;background:rgba(0,0,0,.6);color:#fff}
+.thumb button{position:absolute;top:2px;right:2px;width:22px;height:22px;padding:0;border-radius:50%;line-height:1;font-size:13px}
+button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:6px;padding:7px 12px}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700}
+button.tagbtn{background:var(--tag);color:var(--tag-ink);border-color:var(--tag);font-weight:700}
+button:disabled{opacity:.5;cursor:not-allowed}
+button.link{border:none;background:none;color:var(--accent);padding:0;text-decoration:underline}
+.check{display:flex;align-items:center;gap:8px;font-size:13px}
+.check input{width:auto}
+.note{font-size:12px;color:var(--muted);background:var(--soft);border-radius:6px;padding:8px 10px}
+.apikey[hidden]{display:none}
+
+/* 読み取り結果 */
+.results{display:grid;gap:16px}
+.empty{color:var(--muted);text-align:center;padding:36px 12px;border:1px dashed var(--line);border-radius:10px}
+.photo-block{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.pb-head{display:flex;gap:12px;align-items:center;padding:10px 12px;background:var(--soft);flex-wrap:wrap}
+.pb-head img{width:56px;height:56px;object-fit:cover;border-radius:6px;cursor:zoom-in}
+.pb-head .t{flex:1;min-width:0}
+.pb-head .t div{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%}
+th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle;white-space:nowrap}
+th{font-size:11px;color:var(--muted);font-weight:700;letter-spacing:.04em;background:var(--card);position:sticky;top:0}
+td input,td select{padding:4px 6px;font-size:13px}
+td input.n{font-family:var(--f-num);text-align:right;width:8.5em}
+td.r{text-align:right}
+.conf{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;border:1px solid currentColor;font-weight:700}
+.conf.high{color:var(--good)} .conf.medium{color:var(--warn)} .conf.low{color:var(--bad)}
+tr.lowrow td{background:color-mix(in srgb,var(--bad) 7%,transparent)}
+.pb-foot{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 12px;flex-wrap:wrap}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite;vertical-align:-2px}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spinner{animation:none}}
+
+/* 台帳 */
+.ledger-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.ledger-tools select,.ledger-tools input{width:auto}
+.stats{display:flex;gap:16px;flex-wrap:wrap;font-size:13px}
+.stats b{font-family:var(--f-num);font-size:1.1rem}
+.price-tag{display:inline-block;background:var(--tag);color:var(--tag-ink);font-family:var(--f-num);font-weight:600;padding:0 6px;border-radius:3px}
+.ex{display:inline-block;font-size:10px;padding:0 6px;border-radius:3px;background:var(--soft);color:var(--muted);border:1px solid var(--line);margin-left:4px}
+.ledger-wrap{max-height:520px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--paper);padding:8px 16px;border-radius:999px;font-size:13px;z-index:20}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.75);display:grid;place-items:center;z-index:30;padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.modal img{max-height:90vh;max-width:100%;border-radius:6px}
+.confirm{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>競合価格調査シート</h1>
+      <div class="sub">他社売場の値札写真から、型番・価格・スペックを自動で読み取って台帳にします。</div>
+    </div>
+    <span class="engine" id="engine"><span class="dot" id="engineDot"></span><span id="engineText">読み取りエンジンを確認中…</span></span>
+  </header>
+
+  <div class="grid2">
+    <!-- 左：調査情報と写真 -->
+    <section class="panel" aria-labelledby="h-input">
+      <h2 id="h-input">1. 調査情報と写真</h2>
+      <div class="row2">
+        <label class="f">競合店
+          <input id="competitor" list="competitorList" placeholder="例：ケーズデンキ">
+          <datalist id="competitorList">
+            <option value="ケーズデンキ"><option value="ヤマダデンキ"><option value="ビックカメラ"><option value="ヨドバシカメラ"><option value="エディオン"><option value="ジョーシン"><option value="コジマ"><option value="ベスト電器"><option value="100満ボルト">
+          </datalist>
+        </label>
+        <label class="f">店舗名
+          <input id="store" placeholder="例：成田店">
+        </label>
+      </div>
+      <div class="row2">
+        <label class="f">調査日
+          <input id="surveyDate" type="date">
+        </label>
+        <label class="f">カテゴリ
+          <select id="category"><option value="">写真から自動判定</option></select>
+        </label>
+      </div>
+
+      <div class="drop" id="drop" role="button" tabindex="0" aria-label="写真を選択">
+        <strong>値札の写真をドロップ</strong>
+        <span class="small muted">またはタップして選択（複数枚OK・JPEG/PNG）</span>
+        <input id="file" type="file" accept="image/*" multiple hidden>
+      </div>
+      <div class="thumbs" id="thumbs"></div>
+
+      <label class="check"><input type="checkbox" id="hires" checked> 高精度モード（写真を4分割して拡大読み取り）</label>
+
+      <div class="apikey" id="apiBox" hidden>
+        <label class="f">Anthropic APIキー（このHTMLを単体で開いた場合のみ必要）
+          <input id="apiKey" type="password" placeholder="sk-ant-..." autocomplete="off">
+        </label>
+        <div class="note">キーはこのブラウザの中だけに保存されます。社内配布時はキーの管理ルールに従ってください。</div>
+      </div>
+
+      <button class="primary" id="runBtn" disabled>写真を読み取る</button>
+      <div class="note">撮影のコツ：値札が正面から写るように、1枚に2〜6台程度。黄色い特価POPと通常の値札が両方写っていると、特価と通常価格を分けて読み取ります。</div>
+    </section>
+
+    <!-- 右：読み取り結果 -->
+    <section class="panel" aria-labelledby="h-review">
+      <div class="panel-head">
+        <h2 id="h-review">2. 読み取り結果を確認</h2>
+        <span class="small muted">赤い行は読み取りに自信がない行です。写真と見比べて直してください。</span>
+      </div>
+      <div class="results" id="results">
+        <div class="empty" id="resultsEmpty">写真を読み取ると、値札ごとの行がここに並びます。<br>内容を直してから「台帳に追加」を押してください。</div>
+      </div>
+    </section>
+  </div>
+
+  <!-- 台帳 -->
+  <section class="panel" aria-labelledby="h-ledger">
+    <div class="panel-head">
+      <h2 id="h-ledger">3. 調査台帳</h2>
+      <div class="ledger-tools">
+        <select id="fCat" aria-label="カテゴリで絞り込み"><option value="">全カテゴリ</option></select>
+        <select id="fComp" aria-label="競合店で絞り込み"><option value="">全競合店</option></select>
+        <input id="fText" type="search" placeholder="型番・メーカーで検索" aria-label="検索">
+        <button class="tagbtn" id="csvBtn">CSVで書き出し</button>
+        <button id="jsonBtn">バックアップ(JSON)</button>
+        <button id="importBtn">読み込み</button>
+        <input type="file" id="importFile" accept=".json,application/json" hidden>
+      </div>
+    </div>
+    <div class="stats" id="stats"></div>
+    <div class="ledger-wrap">
+      <table id="ledger">
+        <thead><tr>
+          <th>調査日</th><th>競合店</th><th>店舗</th><th>カテゴリ</th><th>メーカー</th><th>型番</th><th>主要スペック</th>
+          <th class="r">表示価格(税込)</th><th class="r">特価(税込)</th><th class="r">実売(税込)</th><th>特価期間</th><th>特典・工事・保証</th><th>信頼度</th><th></th>
+        </tr></thead>
+        <tbody id="ledgerBody"></tbody>
+      </table>
+    </div>
+    <div class="confirm" id="clearArea">
+      <button class="link" id="clearBtn">台帳をすべて削除</button>
+    </div>
+  </section>
+</div>
+
+<script>
+"use strict";
+/* ================= 設定 ================= */
+const CATS = ["冷蔵庫","洗濯機","炊飯器","電子レンジ","オーブン","ドライヤー","ヘアアイロン","シェーバー","電動歯ブラシ","エアコン","テレビ","パソコン","プリンター"];
+const SPEC_HINT = {
+  "冷蔵庫":"定格内容積(L)、ドア数、幅(cm)", "洗濯機":"洗濯/乾燥容量(kg)、ドラム/縦型", "炊飯器":"炊飯容量(合)、IH/圧力IH",
+  "電子レンジ":"庫内容量(L)、単機能/オーブンレンジ", "オーブン":"庫内容量(L)、最高温度", "ドライヤー":"消費電力(W)、主な機能",
+  "ヘアアイロン":"ストレート/カール、プレート幅・パイプ径", "シェーバー":"刃の枚数、洗浄器の有無", "電動歯ブラシ":"音波/回転、モード数",
+  "エアコン":"畳数(主に〇畳用)、冷房能力(kW)、電源(100V/200V)", "テレビ":"画面サイズ(型)、有機EL/液晶、4K", "パソコン":"CPU、メモリ、ストレージ、画面サイズ",
+  "プリンター":"インクジェット/レーザー、カラー/モノクロ、複合機か"
+};
+const API_MODEL = "claude-sonnet-5-5";
+const STORE_KEY = "competitor-price-survey-v1";
+const KEY_KEY = "competitor-price-survey-apikey";
+
+/* ================= 状態 ================= */
+const state = { photos: [], ledger: [], engine: null, sample: null, downloads: null, busy: false };
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const yen = (n) => (n == null || n === "" || isNaN(n)) ? "" : "¥" + Number(n).toLocaleString("ja-JP");
+const uid = () => Math.random().toString(36).slice(2, 10);
+
+function toast(msg){ const t=document.createElement("div"); t.className="toast"; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),2600); }
+function store(k,v){ try{ localStorage.setItem(k, typeof v==="string"?v:JSON.stringify(v)); }catch(e){} }
+function load(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+
+/* ================= 数値の整形 ================= */
+function toNum(v){
+  if (v == null || v === "") return null;
+  if (typeof v === "number") return isFinite(v) ? Math.round(v) : null;
+  const s = String(v).replace(/[０-９]/g, d => String.fromCharCode(d.charCodeAt(0)-0xFEE0)).replace(/[^\d.]/g, "");
+  if (!s) return null;
+  const n = Math.round(parseFloat(s));
+  return isFinite(n) ? n : null;
+}
+// 税抜⇔税込の片方しか読めなかったときに補完（消費税10%）
+function fillTax(it){
+  for (const [ex, inc] of [["price_ex","price_in"],["sale_ex","sale_in"]]){
+    it[ex] = toNum(it[ex]); it[inc] = toNum(it[inc]);
+    if (it[ex] && !it[inc]) { it[inc] = Math.floor(it[ex]*1.1); it._calc = (it._calc||"") + inc + " "; }
+    if (it[inc] && !it[ex]) { it[ex] = Math.round(it[inc]/1.1); it._calc = (it._calc||"") + ex + " "; }
+  }
+  const cands = [it.price_in, it.sale_in].filter(n => n);
+  it.street_in = cands.length ? Math.min(...cands) : null;
+  return it;
+}
+
+/* ================= 画像の準備 ================= */
+function loadImage(file){
+  return new Promise((res, rej) => { const url = URL.createObjectURL(file); const img = new Image();
+    img.onload = () => res({ img, url }); img.onerror = () => rej(new Error("画像を開けませんでした")); img.src = url; });
+}
+function cropToBlob(img, sx, sy, sw, sh, maxSide){
+  const s = Math.min(1, maxSide / Math.max(sw, sh));
+  const c = document.createElement("canvas"); c.width = Math.max(1,Math.round(sw*s)); c.height = Math.max(1,Math.round(sh*s));
+  c.getContext("2d").drawImage(img, sx, sy, sw, sh, 0, 0, c.width, c.height);
+  return new Promise(r => c.toBlob(b => r(b), "image/jpeg", 0.9));
+}
+// 全体1枚＋重なりのある2×2分割（値札の小さい文字を拡大して読ませる）
+async function buildImages(img, hires, maxCount){
+  const W = img.naturalWidth, H = img.naturalHeight;
+  const out = [await cropToBlob(img, 0, 0, W, H, 1800)];
+  if (hires && maxCount >= 5){
+    const tw = Math.round(W*0.58), th = Math.round(H*0.58);
+    for (const [x,y] of [[0,0],[W-tw,0],[0,H-th],[W-tw,H-th]]) out.push(await cropToBlob(img, x, y, tw, th, 1600));
+  }
+  return out;
+}
+const blobToB64 = (b) => new Promise(r => { const fr = new FileReader(); fr.onload = () => r(String(fr.result).split(",")[1]); fr.readAsDataURL(b); });
+
+/* ================= 読み取りの指示文 ================= */
+function buildPrompt(ctx, nImages){
+  const catRule = ctx.category
+    ? `この写真はすべて「${ctx.category}」の売場です。category は "${ctx.category}" にしてください。`
+    : `category は次のどれか1つ：${CATS.join("、")}。該当しなければ "その他"。`;
+  const specHints = Object.entries(SPEC_HINT).map(([k,v]) => `・${k}：${v}`).join("\n");
+  return `あなたは家電量販店の「競合店価格調査」の入力担当です。
+添付は競合店（${ctx.competitor || "不明"}${ctx.store ? " " + ctx.store : ""}）の売場で撮影した値札（プライスカード）の写真です。${nImages > 1 ? `1枚目が全体、2枚目以降は同じ写真の一部を拡大したもの（重なりあり）です。拡大画像で細かい文字を確認し、同じ商品は1件にまとめてください。` : ""}
+調査日：${ctx.date || "不明"}
+
+写真に写っている商品の値札をすべて読み取り、1商品＝1件で書き出してください。
+
+ルール：
+- 型番は値札の表記どおり（色コード「(W)」なども含める）。読めない文字は「?」にする。推測で埋めない。
+- price_ex/price_in：通常の値札の価格（税抜/税込）。「税別」「税抜」は price_ex、「税込」「10%税込」は price_in。
+- sale_ex/sale_in/sale_period：「今週のお買得品」「期間限定」「特価」など、通常値札とは別のPOPに書かれた値引き価格とその期間（例 "10/24(土)〜10/30(金)"）。無ければ null。
+- 同じ型番に通常値札と特価POPの両方がある場合は、両方を1件にまとめる。
+- install：取付工事費の扱い（「工事代別」「標準工事費 18,700円」など）。warranty：保証（「5年間無料保証」など）。
+- perks：セール対象（「特典1〜7対象」など）、補助金・キャンペーン、ポイント、下取りなど。
+- year：年式やモデル年度（「2026年モデル」など）。
+- spec：その商品の主要スペックを短く。カテゴリごとの目安：
+${specHints}
+- 数値はカンマなしの整数。読めない項目は null。
+- confidence：型番と価格の両方がはっきり読めたら "high"、一部推測なら "medium"、ほぼ読めないなら "low"。
+- 値札が一部しか写っておらず型番も価格も読めない商品は出力しない。
+- ${catRule}
+
+次のJSONだけを返してください（説明文は不要）：
+{"items":[{"category":"エアコン","maker":"日立","model":"RAS-XR40260(W)","name":"白くまくん Xシリーズ","year":"2026年モデル","spec":"14畳用 4.0kW 200V","price_ex":349800,"price_in":384780,"sale_ex":279800,"sale_in":307780,"sale_period":"10/24(土)〜10/30(金)","install":"工事代別","warranty":"10年間無料保証","perks":"エアコンセール特典1〜7対象","note":"","confidence":"high"}]}`;
+}
+
+/* ================= 読み取りエンジン ================= */
+async function initEngine(){
+  const dot = $("engineDot"), txt = $("engineText");
+  if (window.claude && typeof window.claude.use === "function"){
+    try {
+      state.sample = await window.claude.use("sample");
+      state.downloads = await window.claude.use("downloads");
+    } catch(e) { state.sample = null; }
+    if (state.sample){
+      let lim = null; try { lim = await state.sample.limits(); } catch(e){}
+      if (lim && lim.images){ state.engine = { kind:"claude", maxCount: lim.images.maxCount || 1 };
+        dot.className = "dot ok"; txt.textContent = "Claudeで読み取り（あなたのClaude利用枠を使います）"; updateRun(); return; }
+    }
+  }
+  // 単体のHTMLとして開いた場合：APIキーで直接読み取り
+  state.engine = { kind:"api", maxCount: 5 };
+  $("apiBox").hidden = false;
+  const k = load(KEY_KEY); if (k) $("apiKey").value = k;
+  dot.className = "dot warn"; txt.textContent = "APIキーで読み取り（単体モード）";
+  updateRun();
+}
+
+async function extract(photo, ctx, signal){
+  const hires = $("hires").checked;
+  const imgs = await buildImages(photo.img, hires, state.engine.maxCount);
+  const prompt = buildPrompt(ctx, imgs.length);
+  let data;
+  if (state.engine.kind === "claude"){
+    data = await state.sample.json(prompt, { images: imgs, signal });
+  } else {
+    const key = $("apiKey").value.trim();
+    if (!key) throw { code:"no_key", message:"APIキーを入力してください" };
+    store(KEY_KEY, key);
+    const content = [];
+    for (const b of imgs) content.push({ type:"image", source:{ type:"base64", media_type:"image/jpeg", data: await blobToB64(b) } });
+    content.push({ type:"text", text: prompt });
+    const r = await fetch("https://api.anthropic.com/v1/messages", { method:"POST", signal,
+      headers:{ "content-type":"application/json", "x-api-key":key, "anthropic-version":"2023-06-01", "anthropic-dangerous-direct-browser-access":"true" },
+      body: JSON.stringify({ model: API_MODEL, max_tokens: 8000, messages:[{ role:"user", content }] }) });
+    if (!r.ok){ const t = await r.text(); throw { code:"http_"+r.status, message: t.slice(0,200) }; }
+    const j = await r.json();
+    const text = (j.content||[]).filter(c=>c.type==="text").map(c=>c.text).join("");
+    const m = text.match(/\{[\s\S]*\}/); if (!m) throw { code:"invalid_json", message:"結果を読み取れませんでした" };
+    data = JSON.parse(m[0]);
+  }
+  const items = Array.isArray(data) ? data : (data && data.items) || [];
+  return items.map(it => fillTax({ ...it, _id: uid(), _keep: true, category: ctx.category || it.category || "" }));
+}
+
+function errText(e){
+  const c = e && e.code;
+  const map = {
+    not_granted:"Claudeの利用が許可されませんでした。許可すると読み取れます。",
+    rate_limited:"利用が集中しています。少し待ってからもう一度お試しください。",
+    image_rejected:"この画像は読み込めませんでした。JPEGかPNGで撮り直してください。",
+    invalid_json:"読み取り結果の形式が崩れました。もう一度お試しください。",
+    refused:"この写真は読み取れませんでした。",
+    no_key:"APIキーを入力してください。", http_401:"APIキーが正しくありません。",
+    cancelled:"中止しました。"
+  };
+  return map[c] || ("読み取りに失敗しました（" + (c || (e && e.message) || "不明") + "）。もう一度お試しください。");
+}
+
+/* ================= 写真の投入 ================= */
+async function addFiles(files){
+  for (const f of files){
+    if (!f.type.startsWith("image/")) continue;
+    try { const { img, url } = await loadImage(f);
+      state.photos.push({ id: uid(), name: f.name, img, url, status:"待機", items: null, error: null });
+    } catch(e){ toast(f.name + " を開けませんでした"); }
+  }
+  renderThumbs(); updateRun();
+}
+function renderThumbs(){
+  $("thumbs").innerHTML = state.photos.map(p => `
+    <div class="thumb"><img src="${p.url}" alt="${esc(p.name)}">
+      <span class="st">${esc(p.status)}</span>
+      <button data-rm="${p.id}" aria-label="${esc(p.name)} を外す" ${state.busy?"disabled":""}>×</button></div>`).join("");
+}
+function updateRun(){
+  const pending = state.photos.filter(p => p.status !== "完了").length;
+  $("runBtn").disabled = state.busy || !state.engine || pending === 0;
+  $("runBtn").innerHTML = state.busy ? '<span class="spinner"></span> 読み取り中…' : (pending ? `写真を読み取る（${pending}枚）` : "写真を読み取る");
+}
+
+let ctl = null;
+async function runAll(){
+  const ctx = { competitor: $("competitor").value.trim(), store: $("store").value.trim(), date: $("surveyDate").value, category: $("category").value };
+  if (!ctx.competitor){ toast("競合店を入力してください"); $("competitor").focus(); return; }
+  state.busy = true; updateRun(); renderThumbs();
+  for (const p of state.photos){
+    if (p.status === "完了") continue;
+    p.ctx = { ...ctx }; p.status = "読み取り中"; p.error = null; renderThumbs(); renderResults();
+    ctl = new AbortController();
+    try { p.items = await extract(p, ctx, ctl.signal); p.status = "完了"; }
+    catch(e){ p.status = "失敗"; p.error = errText(e); if (e && (e.code === "not_granted" || e.code === "no_key")) { renderThumbs(); renderResults(); break; } }
+    renderThumbs(); renderResults();
+  }
+  state.busy = false; updateRun(); renderThumbs();
+}
+
+/* ================= 読み取り結果（編集） ================= */
+const EDIT_COLS = [
+  ["category","カテゴリ","sel"],["maker","メーカー"],["model","型番"],["name","商品名・シリーズ"],["year","年式"],["spec","主要スペック"],
+  ["price_ex","表示(税抜)","n"],["price_in","表示(税込)","n"],["sale_ex","特価(税抜)","n"],["sale_in","特価(税込)","n"],["sale_period","特価期間"],
+  ["install","工事費"],["warranty","保証"],["perks","特典・POP"],["note","備考"]
+];
+function renderResults(){
+  const box = $("results");
+  const shown = state.photos.filter(p => p.status !== "待機");
+  if (!shown.length){ box.innerHTML = `<div class="empty">写真を読み取ると、値札ごとの行がここに並びます。<br>内容を直してから「台帳に追加」を押してください。</div>`; return; }
+  box.innerHTML = shown.map(p => {
+    let body = "";
+    if (p.status === "読み取り中") body = `<div class="pb-foot"><span><span class="spinner"></span> 値札を読み取っています（30秒〜1分ほど）</span><button data-stop="1">中止</button></div>`;
+    else if (p.status === "失敗") body = `<div class="pb-foot"><span style="color:var(--bad)">${esc(p.error)}</span><button data-retry="${p.id}">もう一度</button></div>`;
+    else if (p.items && !p.items.length) body = `<div class="pb-foot"><span class="muted">値札が見つかりませんでした。値札が正面から写るように撮り直してください。</span></div>`;
+    else if (p.items) body = `
+      <div class="scroll"><table><thead><tr><th>追加</th><th>信頼度</th>${EDIT_COLS.map(c=>`<th>${c[1]}</th>`).join("")}<th></th></tr></thead><tbody>
+      ${p.items.map(it => `<tr class="${it.confidence==="low"?"lowrow":""}" data-pid="${p.id}" data-iid="${it._id}">
+        <td><input type="checkbox" data-k="_keep" ${it._keep?"checked":""} aria-label="この行を追加"></td>
+        <td><span class="conf ${esc(it.confidence||"medium")}">${({high:"高",medium:"中",low:"低"})[it.confidence]||"中"}</span></td>
+        ${EDIT_COLS.map(([k,l,t]) => t==="sel"
+          ? `<td><select data-k="${k}" aria-label="${l}">${[...CATS,"その他"].map(c=>`<option ${c===it[k]?"selected":""}>${c}</option>`).join("")}</select></td>`
+          : `<td><input data-k="${k}" ${t==="n"?'class="n" inputmode="numeric"':""} value="${esc(it[k]??"")}" aria-label="${l}" ${t==="n"&&it._calc&&it._calc.includes(k)?'title="もう一方の価格から計算した値です"':""} style="${t?"":`width:${k==="spec"||k==="perks"?"14em":k==="model"?"11em":"8em"}`}"></td>`).join("")}
+        <td><button data-del="${p.id}:${it._id}" aria-label="行を削除">削除</button></td></tr>`).join("")}
+      </tbody></table></div>
+      <div class="pb-foot"><span class="small muted">${p.items.length}件読み取り ・ 税抜/税込の片方だけ読めた場合はもう一方を10%で計算しています</span>
+        <span style="display:flex;gap:8px"><button data-add-row="${p.id}">行を追加</button><button class="primary" data-commit="${p.id}">台帳に追加</button></span></div>`;
+    return `<div class="photo-block"><div class="pb-head"><img src="${p.url}" alt="" data-zoom="${p.id}">
+      <div class="t"><div><b>${esc(p.name)}</b></div><div class="small muted">${esc((p.ctx&&p.ctx.competitor)||"")} ${esc((p.ctx&&p.ctx.store)||"")} ・ ${esc((p.ctx&&p.ctx.date)||"")}</div></div>
+      <span class="small">${esc(p.status)}</span></div>${body}</div>`;
+  }).join("");
+}
+
+/* ================= 台帳 ================= */
+function saveLedger(){ store(STORE_KEY, state.ledger); }
+function commit(pid){
+  const p = state.photos.find(x => x.id === pid); if (!p || !p.items) return;
+  const rows = p.items.filter(it => it._keep).map(it => {
+    const r = fillTax({ ...it });
+    return { id: uid(), date: p.ctx.date, competitor: p.ctx.competitor, store: p.ctx.store, photo: p.name,
+      category: r.category, maker: r.maker||"", model: r.model||"", name: r.name||"", year: r.year||"", spec: r.spec||"",
+      price_ex: r.price_ex, price_in: r.price_in, sale_ex: r.sale_ex, sale_in: r.sale_in, street_in: r.street_in,
+      sale_period: r.sale_period||"", install: r.install||"", warranty: r.warranty||"", perks: r.perks||"", note: r.note||"",
+      confidence: r.confidence||"medium", createdAt: new Date().toISOString() };
+  });
+  if (!rows.length){ toast("追加する行にチェックを入れてください"); return; }
+  state.ledger = state.ledger.filter(r => !r.example).concat(rows);
+  saveLedger();
+  state.photos = state.photos.filter(x => x.id !== pid);
+  renderThumbs(); renderResults(); renderLedger(); updateRun();
+  toast(rows.length + "件を台帳に追加しました");
+}
+function filtered(){
+  const c = $("fCat").value, cp = $("fComp").value, q = $("fText").value.trim().toLowerCase();
+  return state.ledger.filter(r => (!c || r.category === c) && (!cp || r.competitor === cp) &&
+    (!q || (r.model + " " + r.maker + " " + r.name + " " + r.spec).toLowerCase().includes(q)));
+}
+function renderLedger(){
+  const comps = [...new Set(state.ledger.map(r => r.competitor).filter(Boolean))];
+  const cur = $("fComp").value;
+  $("fComp").innerHTML = `<option value="">全競合店</option>` + comps.map(c => `<option ${c===cur?"selected":""}>${esc(c)}</option>`).join("");
+  const rows = filtered().slice().sort((a,b) => (b.date||"").localeCompare(a.date||"") || (a.category||"").localeCompare(b.category||""));
+  const lowN = rows.filter(r => r.confidence === "low").length;
+  $("stats").innerHTML = `<span>表示 <b>${rows.length}</b> 件</span><span>競合店 <b>${new Set(rows.map(r=>r.competitor)).size}</b></span><span>カテゴリ <b>${new Set(rows.map(r=>r.category)).size}</b></span>${lowN?`<span style="color:var(--bad)">要確認 <b>${lowN}</b> 件</span>`:""}`;
+  $("ledgerBody").innerHTML = rows.length ? rows.map(r => `<tr>
+    <td class="num">${esc(r.date)}</td><td>${esc(r.competitor)}${r.example?'<span class="ex">例</span>':""}</td><td>${esc(r.store)}</td><td>${esc(r.category)}</td>
+    <td>${esc(r.maker)}</td><td class="num">${esc(r.model)}</td><td>${esc(r.spec)}</td>
+    <td class="r num">${yen(r.price_in)}</td><td class="r num">${yen(r.sale_in)}</td>
+    <td class="r">${r.street_in?`<span class="price-tag">${yen(r.street_in)}</span>`:""}</td>
+    <td>${esc(r.sale_period)}</td><td class="small">${esc([r.perks,r.install,r.warranty].filter(Boolean).join(" / "))}</td>
+    <td><span class="conf ${esc(r.confidence)}">${({high:"高",medium:"中",low:"低"})[r.confidence]||"中"}</span></td>
+    <td><button data-ldel="${r.id}" aria-label="削除">削除</button></td></tr>`).join("")
+    : `<tr><td colspan="14" class="muted" style="text-align:center;padding:24px">まだ登録がありません。写真を読み取って「台帳に追加」すると、ここに溜まっていきます。</td></tr>`;
+}
+
+/* ================= 書き出し ================= */
+const CSV_COLS = [["date","調査日"],["competitor","競合店"],["store","店舗"],["category","カテゴリ"],["maker","メーカー"],["model","型番"],["name","商品名・シリーズ"],["year","年式"],["spec","主要スペック"],
+  ["price_ex","表示価格(税抜)"],["price_in","表示価格(税込)"],["sale_ex","特価(税抜)"],["sale_in","特価(税込)"],["street_in","実売価格(税込)"],["sale_period","特価期間"],
+  ["install","工事費"],["warranty","保証"],["perks","特典・POP"],["note","備考"],["confidence","信頼度"],["photo","写真ファイル"]];
+function toCSV(rows){
+  const q = v => { const s = v == null ? "" : String(v); return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s; };
+  return "﻿" + [CSV_COLS.map(c=>c[1]).join(","), ...rows.map(r => CSV_COLS.map(([k]) => q(r[k])).join(","))].join("\r\n");
+}
+async function saveFile(filename, text, mime){
+  if (state.downloads){
+    try { await state.downloads.save({ filename, data: text }); toast("保存しました"); return; }
+    catch(e){ if (e && e.code === "declined") return; }
+  }
+  try { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type: mime })); a.download = filename; document.body.appendChild(a); a.click(); a.remove(); }
+  catch(e){ toast("この画面では保存できませんでした"); }
+}
+const stamp = () => new Date().toISOString().slice(0,10).replace(/-/g,"");
+
+/* ================= イベント ================= */
+const drop = $("drop"), fileInput = $("file");
+drop.addEventListener("click", () => fileInput.click());
+drop.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " "){ e.preventDefault(); fileInput.click(); } });
+fileInput.addEventListener("change", () => { addFiles([...fileInput.files]); fileInput.value = ""; });
+["dragenter","dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave","drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", e => addFiles([...e.dataTransfer.files]));
+document.addEventListener("paste", e => { const fs = [...(e.clipboardData?.files || [])]; if (fs.length) addFiles(fs); });
+
+$("thumbs").addEventListener("click", e => { const id = e.target.dataset.rm; if (!id) return;
+  const p = state.photos.find(x => x.id === id); if (p) URL.revokeObjectURL(p.url);
+  state.photos = state.photos.filter(x => x.id !== id); renderThumbs(); renderResults(); updateRun(); });
+$("runBtn").addEventListener("click", runAll);
+
+$("results").addEventListener("input", e => {
+  const k = e.target.dataset.k, tr = e.target.closest("tr"); if (!k || !tr) return;
+  const p = state.photos.find(x => x.id === tr.dataset.pid); const it = p && p.items.find(x => x._id === tr.dataset.iid); if (!it) return;
+  it[k] = e.target.type === "checkbox" ? e.target.checked : e.target.value;
+  if (it._calc && it._calc.includes(k)) it._calc = it._calc.replace(k + " ", "");
+});
+$("results").addEventListener("click", e => {
+  const t = e.target;
+  if (t.dataset.stop){ ctl && ctl.abort(); }
+  if (t.dataset.retry){ const p = state.photos.find(x => x.id === t.dataset.retry); if (p){ p.status = "待機"; renderResults(); runAll(); } }
+  if (t.dataset.commit) commit(t.dataset.commit);
+  if (t.dataset.del){ const [pid, iid] = t.dataset.del.split(":"); const p = state.photos.find(x => x.id === pid); if (p){ p.items = p.items.filter(i => i._id !== iid); renderResults(); } }
+  if (t.dataset.addRow){ const p = state.photos.find(x => x.id === t.dataset.addRow); if (p){ p.items.push({ _id: uid(), _keep: true, category: p.ctx.category || "", confidence: "medium" }); renderResults(); } }
+  if (t.dataset.zoom){ const p = state.photos.find(x => x.id === t.dataset.zoom); if (p){ const m = document.createElement("div"); m.className = "modal"; m.innerHTML = `<img src="${p.url}" alt="">`; m.onclick = () => m.remove(); document.body.appendChild(m); } }
+});
+
+["fCat","fComp","fText"].forEach(id => $(id).addEventListener("input", renderLedger));
+$("ledgerBody").addEventListener("click", e => { const id = e.target.dataset.ldel; if (!id) return;
+  state.ledger = state.ledger.filter(r => r.id !== id); saveLedger(); renderLedger(); });
+$("csvBtn").addEventListener("click", () => { const rows = filtered().filter(r => !r.example);
+  if (!rows.length){ toast("書き出す行がありません"); return; }
+  saveFile(`競合価格調査_${stamp()}.csv`, toCSV(rows), "text/csv"); });
+$("jsonBtn").addEventListener("click", () => saveFile(`競合価格調査_backup_${stamp()}.json`, JSON.stringify(state.ledger.filter(r=>!r.example), null, 2), "application/json"));
+$("importBtn").addEventListener("click", () => $("importFile").click());
+$("importFile").addEventListener("change", async () => {
+  const f = $("importFile").files[0]; $("importFile").value = ""; if (!f) return;
+  try { const arr = JSON.parse(await f.text()); if (!Array.isArray(arr)) throw 0;
+    const ids = new Set(state.ledger.map(r => r.id)); const add = arr.filter(r => r && r.id && !ids.has(r.id));
+    state.ledger = state.ledger.filter(r => !r.example).concat(add); saveLedger(); renderLedger(); toast(add.length + "件を読み込みました");
+  } catch(e){ toast("バックアップファイルを読み込めませんでした"); }
+});
+$("clearBtn").addEventListener("click", () => {
+  const area = $("clearArea");
+  area.innerHTML = `<span>台帳の${state.ledger.length}件をすべて削除します。元に戻せません。</span><button id="clearYes" style="color:var(--bad);border-color:var(--bad)">削除する</button><button id="clearNo">やめる</button>`;
+  $("clearNo").onclick = resetClear;
+  $("clearYes").onclick = () => { state.ledger = []; saveLedger(); renderLedger(); resetClear(); toast("台帳を削除しました"); };
+});
+function resetClear(){ $("clearArea").innerHTML = `<button class="link" id="clearBtn2">台帳をすべて削除</button>`; $("clearBtn2").onclick = () => $("clearBtn").click(); }
+$("competitor").addEventListener("change", () => store("cps-competitor", $("competitor").value));
+$("store").addEventListener("change", () => store("cps-store", $("store").value));
+
+/* ================= 起動 ================= */
+(function boot(){
+  const sel = $("category"), fc = $("fCat");
+  CATS.forEach(c => { sel.add(new Option(c, c)); fc.add(new Option(c, c)); });
+  const d = new Date(); $("surveyDate").value = new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString().slice(0,10);
+  $("competitor").value = load("cps-competitor") || ""; $("store").value = load("cps-store") || "";
+  try { const s = JSON.parse(load(STORE_KEY) || "null"); if (Array.isArray(s)) state.ledger = s; } catch(e){}
+  if (!state.ledger.length){
+    // 表示例（最初の登録で自動的に消えます。CSVには出力されません）
+    state.ledger = [
+      fillTax({ id:"ex1", example:true, date:"2026-10-24", competitor:"ケーズデンキ", store:"（例）", category:"エアコン", maker:"日立", model:"RAS-XR40260(W)", name:"白くまくん Xシリーズ", year:"2026年モデル", spec:"14畳用 4.0kW", price_ex:349800, price_in:384780, sale_ex:279800, sale_in:307780, sale_period:"10/24(土)〜10/30(金)", install:"工事代別", warranty:"10年間無料保証", perks:"エアコンセール特典1〜7対象", confidence:"high" }),
+      fillTax({ id:"ex2", example:true, date:"2026-10-24", competitor:"ケーズデンキ", store:"（例）", category:"エアコン", maker:"日立", model:"RAS-XR56260(W)", name:"白くまくん Xシリーズ", year:"2026年モデル", spec:"18畳用 5.6kW", price_ex:369800, price_in:406780, sale_ex:299800, sale_in:329780, sale_period:"10/24(土)〜10/30(金)", install:"工事代別", warranty:"10年間無料保証", perks:"エアコンセール特典1〜7対象", confidence:"medium" })
+    ];
+  }
+  renderThumbs(); renderResults(); renderLedger(); updateRun();
+  initEngine();
+})();
+</script>
+
+</html>
