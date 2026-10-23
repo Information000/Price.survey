@@ -148,7 +148,7 @@ tr.lowrow td{background:color-mix(in srgb,var(--bad) 7%,transparent)}
       </div>
       <div class="thumbs" id="thumbs"></div>
 
-      <label class="check"><input type="checkbox" id="hires" checked> 高精度モード（写真を4分割して拡大読み取り）</label>
+      <label class="check"><input type="checkbox" id="hires" checked> 2段階読み取り（札の位置を探してから1枚ずつ拡大して読む・推奨）</label>
 
       <div class="apikey" id="apiBox" hidden>
         <label class="f">Anthropic APIキー（このHTMLを単体で開いた場合のみ必要）
@@ -158,7 +158,7 @@ tr.lowrow td{background:color-mix(in srgb,var(--bad) 7%,transparent)}
       </div>
 
       <button class="primary" id="runBtn" disabled>写真を読み取る</button>
-      <div class="note">撮影のコツ：値札が正面から写るように、1枚に2〜6台程度。黄色い特価POPと通常の値札が両方写っていると、特価と通常価格を分けて読み取ります。</div>
+      <div class="note">撮影のコツ：値札が正面から写るように、1枚に2〜6台程度。<b>LINEで送った写真は画質が落ち、型番が読めなくなります。</b>カメラの元の写真を使うか、LINEなら「オリジナル画質」で送ってください。</div>
     </section>
 
     <!-- 右：読み取り結果 -->
@@ -216,7 +216,7 @@ const SPEC_HINT = {
   "エアコン":"畳数(主に〇畳用)、冷房能力(kW)、電源(100V/200V)", "テレビ":"画面サイズ(型)、有機EL/液晶、4K", "パソコン":"CPU、メモリ、ストレージ、画面サイズ",
   "プリンター":"インクジェット/レーザー、カラー/モノクロ、複合機か"
 };
-const API_MODEL = "claude-sonnet-5-5";
+const API_MODEL = "claude-opus-5-5";
 const STORE_KEY = "competitor-price-survey-v1";
 const KEY_KEY = "competitor-price-survey-apikey";
 
@@ -247,6 +247,14 @@ function fillTax(it){
     if (it[ex] && !it[inc]) { it[inc] = Math.floor(it[ex]*1.1); it._calc = (it._calc||"") + inc + " "; }
     if (it[inc] && !it[ex]) { it[ex] = Math.round(it[inc]/1.1); it._calc = (it._calc||"") + ex + " "; }
   }
+  // 税込と税抜が両方読めたのに10%で合わない＝数字の読み違いの可能性
+  for (const [ex, inc] of [["price_ex","price_in"],["sale_ex","sale_in"]]){
+    if (it[ex] && it[inc] && !(it._calc||"").includes(ex) && !(it._calc||"").includes(inc) && Math.abs(Math.floor(it[ex]*1.1) - it[inc]) > 2){
+      it.confidence = "low";
+      const msg = `税抜${yen(it[ex])}と税込${yen(it[inc])}が合いません`;
+      if (!String(it.note||"").includes(msg)) it.note = [it.note, msg].filter(Boolean).join("／");
+    }
+  }
   const cands = [it.price_in, it.sale_in].filter(n => n);
   it.street_in = cands.length ? Math.min(...cands) : null;
   return it;
@@ -257,53 +265,63 @@ function loadImage(file){
   return new Promise((res, rej) => { const url = URL.createObjectURL(file); const img = new Image();
     img.onload = () => res({ img, url }); img.onerror = () => rej(new Error("画像を開けませんでした")); img.src = url; });
 }
-function cropToBlob(img, sx, sy, sw, sh, maxSide){
-  const s = Math.min(1, maxSide / Math.max(sw, sh));
-  const c = document.createElement("canvas"); c.width = Math.max(1,Math.round(sw*s)); c.height = Math.max(1,Math.round(sh*s));
-  c.getContext("2d").drawImage(img, sx, sy, sw, sh, 0, 0, c.width, c.height);
-  return new Promise(r => c.toBlob(b => r(b), "image/jpeg", 0.9));
+// 切り出して、読み取り側の上限（約1.15メガピクセル）いっぱいまで拡大・縮小する
+function cropFit(img, sx, sy, sw, sh, targetPx = 1150000, maxUp = 3){
+  sx = Math.max(0, Math.round(sx)); sy = Math.max(0, Math.round(sy));
+  sw = Math.min(img.naturalWidth - sx, Math.round(sw)); sh = Math.min(img.naturalHeight - sy, Math.round(sh));
+  const s = Math.min(maxUp, Math.sqrt(targetPx / (sw * sh)));
+  const c = document.createElement("canvas"); c.width = Math.max(1, Math.round(sw * s)); c.height = Math.max(1, Math.round(sh * s));
+  const g = c.getContext("2d"); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = "high";
+  g.drawImage(img, sx, sy, sw, sh, 0, 0, c.width, c.height);
+  return new Promise(r => c.toBlob(b => r(b), "image/jpeg", 0.92));
 }
-// 全体1枚＋重なりのある2×2分割（値札の小さい文字を拡大して読ませる）
-async function buildImages(img, hires, maxCount){
-  const W = img.naturalWidth, H = img.naturalHeight;
-  const out = [await cropToBlob(img, 0, 0, W, H, 1800)];
-  if (hires && maxCount >= 5){
-    const tw = Math.round(W*0.58), th = Math.round(H*0.58);
-    for (const [x,y] of [[0,0],[W-tw,0],[0,H-th],[W-tw,H-th]]) out.push(await cropToBlob(img, x, y, tw, th, 1600));
-  }
+// 予備：重なりのある3×3分割
+async function gridCrops(img){
+  const W = img.naturalWidth, H = img.naturalHeight, tw = W * 0.42, th = H * 0.42, out = [];
+  for (const fy of [0, 0.5, 1]) for (const fx of [0, 0.5, 1]) out.push(await cropFit(img, (W - tw) * fx, (H - th) * fy, tw, th));
   return out;
 }
 const blobToB64 = (b) => new Promise(r => { const fr = new FileReader(); fr.onload = () => r(String(fr.result).split(",")[1]); fr.readAsDataURL(b); });
 
 /* ================= 読み取りの指示文 ================= */
-function buildPrompt(ctx, nImages){
-  const catRule = ctx.category
-    ? `この写真はすべて「${ctx.category}」の売場です。category は "${ctx.category}" にしてください。`
-    : `category は次のどれか1つ：${CATS.join("、")}。該当しなければ "その他"。`;
-  const specHints = Object.entries(SPEC_HINT).map(([k,v]) => `・${k}：${v}`).join("\n");
-  return `あなたは家電量販店の「競合店価格調査」の入力担当です。
-添付は競合店（${ctx.competitor || "不明"}${ctx.store ? " " + ctx.store : ""}）の売場で撮影した値札（プライスカード）の写真です。${nImages > 1 ? `1枚目が全体、2枚目以降は同じ写真の一部を拡大したもの（重なりあり）です。拡大画像で細かい文字を確認し、同じ商品は1件にまとめてください。` : ""}
-調査日：${ctx.date || "不明"}
+const LOCATE_PROMPT = `家電量販店の売場写真です。価格が書かれた札をすべて探し、位置だけを返してください（文字を読む必要はありません）。
+対象：白いスペック値札、黄色・赤などの価格POP、「今週のお買得品」などの特価POP、工事費の札。
+- 札1枚ごとに1件。隣り合う別の札は別々にする。
+- 座標は画像の左上を(0,0)、右下を(1000,1000)とした整数で [左, 上, 右, 下]。札の端が切れないよう少し大きめに。
+- 写真の端で切れていて文字がほとんど見えない札は除く。
+次のJSONだけを返してください：
+{"tags":[{"box":[0,0,0,0]}]}`;
 
-写真に写っている商品の値札をすべて読み取り、1商品＝1件で書き出してください。
+function readPrompt(ctx, n, mode){
+  const catRule = ctx.category ? `category はすべて "${ctx.category}"。` : `category は次のどれか：${CATS.join("、")}。該当しなければ "その他"。`;
+  const specHints = Object.entries(SPEC_HINT).map(([k,v]) => `・${k}：${v}`).join("\n");
+  const how = mode === "tags"
+    ? `添付の画像${n}枚は、同じ売場写真から札を1枚ずつ切り出して拡大したものです（1枚目＝image 1）。各画像の中心にある札を読んでください。端に隣の札が写っていても、型番と価格の両方が読めるなら読んでかまいません。`
+    : `添付の画像${n}枚は、同じ売場写真を重なりのある9区画に分けて拡大したものです。各画像に写っている札を読んでください。画像の端で切れて型番も価格も読めない札は無視してください（隣の画像に写っています）。同じ札が複数の画像に写っていても、それぞれ書き出してかまいません。`;
+  return `あなたは家電量販店の競合店価格調査の担当です。競合店：${ctx.competitor || "不明"}。
+${how}
+
+札に印字された文字だけを書き出してください。推測で補わないことが最も大切です。
 
 ルール：
-- 型番は値札の表記どおり（色コード「(W)」なども含める）。読めない文字は「?」にする。推測で埋めない。
-- price_ex/price_in：通常の値札の価格（税抜/税込）。「税別」「税抜」は price_ex、「税込」「10%税込」は price_in。
-- sale_ex/sale_in/sale_period：「今週のお買得品」「期間限定」「特価」など、通常値札とは別のPOPに書かれた値引き価格とその期間（例 "10/24(土)〜10/30(金)"）。無ければ null。
-- 同じ型番に通常値札と特価POPの両方がある場合は、両方を1件にまとめる。
-- install：取付工事費の扱い（「工事代別」「標準工事費 18,700円」など）。warranty：保証（「5年間無料保証」など）。
-- perks：セール対象（「特典1〜7対象」など）、補助金・キャンペーン、ポイント、下取りなど。
-- year：年式やモデル年度（「2026年モデル」など）。
-- spec：その商品の主要スペックを短く。カテゴリごとの目安：
+- 1件＝札1枚の1つの価格。1枚に複数の型番・価格が並ぶ場合は分ける。
+- model：札に印字された型番を1文字ずつ正確に。「(W)」などの色記号も含める。近くの商品本体や別の札から型番を推測しない。「0」と「D」、「8」と「B」、「5」と「S」、「1」と「I」は特に注意し、判別できない文字は「?」にする。型番が見えなければ null。
+- kind：
+  "店頭価格" … 期間の書かれていない通常の売価（「◯◯特価」「特選良品」と書かれていても期間が無ければこれ）
+  "期間特価" … 「今週のお買得品」「◯/◯〜◯/◯」など期間付きの価格。期間を period に。
+  "工事費" … 標準取付工事料金などの札。内容を install に。
+  "スペックのみ" … 型番やスペックはあるが価格が無い札。
+- price_ex：「税別」「税抜」の金額。price_in：「税込」「10%税込」の金額。カンマなしの整数。札に無ければ null（計算しない）。
+- 新製品・年式違い（例：2026年モデルと2027年モデル）は型番が違う別の商品。まとめない。
+- spec：カテゴリごとの目安
 ${specHints}
-- 数値はカンマなしの整数。読めない項目は null。
-- confidence：型番と価格の両方がはっきり読めたら "high"、一部推測なら "medium"、ほぼ読めないなら "low"。
-- 値札が一部しか写っておらず型番も価格も読めない商品は出力しない。
+- warranty：保証（例「5年間無料保証」）。install：工事費の扱い（例「取付工事代別」）。perks：セール対象・ポイント・補助金など。year：年式。
 - ${catRule}
+- confidence：型番と価格がどちらもはっきり読めた "high"、一部の文字に自信がない "medium"、ほぼ推測 "low"。
+- note：読めなかった箇所など。
 
-次のJSONだけを返してください（説明文は不要）：
-{"items":[{"category":"エアコン","maker":"日立","model":"RAS-XR40260(W)","name":"白くまくん Xシリーズ","year":"2026年モデル","spec":"14畳用 4.0kW 200V","price_ex":349800,"price_in":384780,"sale_ex":279800,"sale_in":307780,"sale_period":"10/24(土)〜10/30(金)","install":"工事代別","warranty":"10年間無料保証","perks":"エアコンセール特典1〜7対象","note":"","confidence":"high"}]}`;
+次の形のJSONだけを返してください（値は札から読んだものに置き換える）：
+{"items":[{"image":1,"kind":"店頭価格","category":"","maker":"","model":"","name":"","year":"","spec":"","price_ex":null,"price_in":null,"period":"","warranty":"","install":"","perks":"","confidence":"high","note":""}]}`;
 }
 
 /* ================= 読み取りエンジン ================= */
@@ -316,44 +334,127 @@ async function initEngine(){
     } catch(e) { state.sample = null; }
     if (state.sample){
       let lim = null; try { lim = await state.sample.limits(); } catch(e){}
-      if (lim && lim.images){ state.engine = { kind:"claude", maxCount: lim.images.maxCount || 1 };
+      if (lim && lim.images){ state.engine = { kind:"claude", maxCount: Math.max(1, lim.images.maxCount || 1) };
         dot.className = "dot ok"; txt.textContent = "Claudeで読み取り（あなたのClaude利用枠を使います）"; updateRun(); return; }
     }
   }
   // 単体のHTMLとして開いた場合：APIキーで直接読み取り
-  state.engine = { kind:"api", maxCount: 5 };
+  state.engine = { kind:"api", maxCount: 20 };
   $("apiBox").hidden = false;
   const k = load(KEY_KEY); if (k) $("apiKey").value = k;
   dot.className = "dot warn"; txt.textContent = "APIキーで読み取り（単体モード）";
   updateRun();
 }
 
-async function extract(photo, ctx, signal){
-  const hires = $("hires").checked;
-  const imgs = await buildImages(photo.img, hires, state.engine.maxCount);
-  const prompt = buildPrompt(ctx, imgs.length);
-  let data;
-  if (state.engine.kind === "claude"){
-    data = await state.sample.json(prompt, { images: imgs, signal });
-  } else {
-    const key = $("apiKey").value.trim();
-    if (!key) throw { code:"no_key", message:"APIキーを入力してください" };
-    store(KEY_KEY, key);
-    const content = [];
-    for (const b of imgs) content.push({ type:"image", source:{ type:"base64", media_type:"image/jpeg", data: await blobToB64(b) } });
-    content.push({ type:"text", text: prompt });
-    const r = await fetch("https://api.anthropic.com/v1/messages", { method:"POST", signal,
-      headers:{ "content-type":"application/json", "x-api-key":key, "anthropic-version":"2023-06-01", "anthropic-dangerous-direct-browser-access":"true" },
-      body: JSON.stringify({ model: API_MODEL, max_tokens: 8000, messages:[{ role:"user", content }] }) });
-    if (!r.ok){ const t = await r.text(); throw { code:"http_"+r.status, message: t.slice(0,200) }; }
-    const j = await r.json();
-    const text = (j.content||[]).filter(c=>c.type==="text").map(c=>c.text).join("");
-    const m = text.match(/\{[\s\S]*\}/); if (!m) throw { code:"invalid_json", message:"結果を読み取れませんでした" };
-    data = JSON.parse(m[0]);
-  }
-  const items = Array.isArray(data) ? data : (data && data.items) || [];
-  return items.map(it => fillTax({ ...it, _id: uid(), _keep: true, category: ctx.category || it.category || "" }));
+async function askJSON(prompt, blobs, signal){
+  if (state.engine.kind === "claude")
+    return state.sample.json(prompt, { images: blobs, signal, modelTier: "complex" });
+  const key = $("apiKey").value.trim();
+  if (!key) throw { code:"no_key", message:"APIキーを入力してください" };
+  store(KEY_KEY, key);
+  const content = [];
+  for (const b of blobs) content.push({ type:"image", source:{ type:"base64", media_type:"image/jpeg", data: await blobToB64(b) } });
+  content.push({ type:"text", text: prompt });
+  const r = await fetch("https://api.anthropic.com/v1/messages", { method:"POST", signal,
+    headers:{ "content-type":"application/json", "x-api-key":key, "anthropic-version":"2023-06-01", "anthropic-dangerous-direct-browser-access":"true" },
+    body: JSON.stringify({ model: API_MODEL, max_tokens: 12000, messages:[{ role:"user", content }] }) });
+  if (!r.ok){ const t = await r.text(); throw { code:"http_"+r.status, message: t.slice(0,200) }; }
+  const j = await r.json();
+  const text = (j.content||[]).filter(c=>c.type==="text").map(c=>c.text).join("");
+  const m = text.match(/\{[\s\S]*\}/); if (!m) throw { code:"invalid_json", message:"結果を読み取れませんでした" };
+  return JSON.parse(m[0]);
 }
+
+// 写真1枚の読み取り：①札の位置を探す → ②札ごとに切り出し拡大して読む → ③型番ごとにまとめる
+async function extract(photo, ctx, signal){
+  const img = photo.img, W = img.naturalWidth, H = img.naturalHeight;
+  const twoStage = $("hires").checked;
+  let crops = [], mode = "grid";
+  if (twoStage){
+    setPhase(photo, "札の位置を探しています");
+    try {
+      const loc = await askJSON(LOCATE_PROMPT, [await cropFit(img, 0, 0, W, H, 1150000, 1)], signal);
+      const boxes = ((loc && loc.tags) || []).map(t => t && t.box).filter(b => Array.isArray(b) && b.length === 4 && b.every(n => isFinite(n)));
+      for (const b of boxes.slice(0, 40)){
+        let [x0, y0, x1, y1] = b.map(Number);
+        if (x1 < x0) [x0, x1] = [x1, x0];
+        if (y1 < y0) [y0, y1] = [y1, y0];
+        const bw = (x1 - x0) / 1000 * W, bh = (y1 - y0) / 1000 * H;
+        const pad = Math.max(bw, bh) * 0.25 + Math.min(W, H) * 0.02;   // 位置のずれを見込んで余白を取る
+        crops.push(await cropFit(img, x0 / 1000 * W - pad, y0 / 1000 * H - pad, bw + pad * 2, bh + pad * 2));
+      }
+      if (crops.length) mode = "tags";
+    } catch(e){ if (e && ["cancelled","not_granted","no_key","http_401","rate_limited"].includes(e.code)) throw e; }
+  }
+  if (!crops.length) crops = await gridCrops(img);
+
+  const per = Math.max(1, Math.min(state.engine.maxCount, 12));
+  const entries = [];
+  for (let i = 0; i < crops.length; i += per){
+    const batch = crops.slice(i, i + per);
+    setPhase(photo, `札を読んでいます（${Math.min(i + per, crops.length)}/${crops.length}枚目）`);
+    const data = await askJSON(readPrompt(ctx, batch.length, mode), batch, signal);
+    const items = Array.isArray(data) ? data : (data && data.items) || [];
+    items.forEach(it => entries.push({ ...it, image: (Number(it.image) || 1) + i }));
+  }
+  return mergeEntries(entries, ctx);
+}
+
+/* ================= 型番ごとにまとめる ================= */
+const normModel = (s) => String(s || "").normalize("NFKC").toUpperCase().replace(/\s+/g, "");
+const groupKey = (s) => normModel(s).replace(/\([A-Z0-9]{1,3}\)$/, "");   // 色記号の有無は同じ商品として扱う
+const CONF_RANK = { high: 3, medium: 2, low: 1 };
+const worst = (...cs) => cs.filter(Boolean).sort((a, b) => (CONF_RANK[a] || 2) - (CONF_RANK[b] || 2))[0] || "medium";
+
+function mergeEntries(entries, ctx){
+  const groups = new Map(), installs = new Set(), orphans = [];
+  for (const e of entries){
+    e.price_ex = toNum(e.price_ex); e.price_in = toNum(e.price_in);
+    if (e.kind === "工事費"){ if (e.install) installs.add(String(e.install)); continue; }
+    const k = groupKey(e.model);
+    if (!k || k.replace(/\?/g, "").length < 4){ if (e.price_ex || e.price_in) orphans.push(e); continue; }
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(e);
+  }
+  const pick = (list, f) => { for (const e of list) if (e[f] != null && String(e[f]).trim() !== "") return String(e[f]).trim(); return ""; };
+  const distinct = (arr) => [...new Map(arr.map(e => [(e.price_ex || 0) + "/" + (e.price_in || 0), e])).values()];
+  const rows = [];
+  for (const list of groups.values()){
+    const notes = [];
+    const models = list.map(e => normModel(e.model)).sort((a, b) => b.length - a.length);
+    const reg = distinct(list.filter(e => e.kind !== "期間特価" && (e.price_ex || e.price_in)));
+    const sal = distinct(list.filter(e => e.kind === "期間特価" && (e.price_ex || e.price_in)));
+    if (reg.length > 1) notes.push("店頭価格の読みが複数：" + reg.map(e => [yen(e.price_ex), yen(e.price_in)].filter(Boolean).join("・")).join(" / "));
+    if (sal.length > 1) notes.push("特価の読みが複数：" + sal.map(e => [yen(e.price_ex), yen(e.price_in)].filter(Boolean).join("・")).join(" / "));
+    if (new Set(models).size > 1) notes.push("型番の読みが揺れています：" + [...new Set(list.map(e => e.model))].join(" / "));
+    const r = reg[0], sv = sal[0];
+    const it = {
+      category: ctx.category || pick(list, "category"), maker: pick(list, "maker"),
+      model: (list.find(e => normModel(e.model) === models[0]) || {}).model || models[0],
+      name: pick(list, "name"), year: pick(list, "year"), spec: pick(list, "spec"),
+      price_ex: r ? r.price_ex : null, price_in: r ? r.price_in : null,
+      sale_ex: sv ? sv.price_ex : null, sale_in: sv ? sv.price_in : null, sale_period: sv ? (sv.period || "") : "",
+      install: pick(list, "install"), warranty: pick(list, "warranty"), perks: pick(list, "perks"),
+      note: [pick(list, "note"), ...notes].filter(Boolean).join("／"),
+      confidence: worst(...list.filter(e => e.price_ex || e.price_in).map(e => e.confidence), notes.length ? "medium" : null),
+      _id: uid(), _keep: !!(r || sv)
+    };
+    if (!r && !sv) { it.note = ["価格の札が見つかりませんでした", it.note].filter(Boolean).join("／"); it.confidence = "low"; }
+    if (/\?/.test(it.model)) it.confidence = worst(it.confidence, "medium");
+    rows.push(it);
+  }
+  for (const e of orphans){
+    const isSale = e.kind === "期間特価";
+    rows.push({ category: ctx.category || e.category || "", maker: e.maker || "", model: "", name: e.name || "", spec: e.spec || "",
+      price_ex: isSale ? null : e.price_ex, price_in: isSale ? null : e.price_in,
+      sale_ex: isSale ? e.price_ex : null, sale_in: isSale ? e.price_in : null, sale_period: e.period || "",
+      note: "型番が読めませんでした", confidence: "low", _id: uid(), _keep: false });
+  }
+  const inst = [...installs].join(" / ");
+  rows.forEach(it => { if (inst && !it.install) it.install = inst; fillTax(it); });
+  return rows.sort((a, b) => (!a.model) - (!b.model) || String(a.model).localeCompare(String(b.model)));
+}
+function setPhase(photo, text){ photo.phase = text; renderResults(); }
 
 function errText(e){
   const c = e && e.code;
@@ -419,7 +520,7 @@ function renderResults(){
   if (!shown.length){ box.innerHTML = `<div class="empty">写真を読み取ると、値札ごとの行がここに並びます。<br>内容を直してから「台帳に追加」を押してください。</div>`; return; }
   box.innerHTML = shown.map(p => {
     let body = "";
-    if (p.status === "読み取り中") body = `<div class="pb-foot"><span><span class="spinner"></span> 値札を読み取っています（30秒〜1分ほど）</span><button data-stop="1">中止</button></div>`;
+    if (p.status === "読み取り中") body = `<div class="pb-foot"><span><span class="spinner"></span> ${esc(p.phase || "準備しています")}（1枚あたり1〜3分ほど）</span><button data-stop="1">中止</button></div>`;
     else if (p.status === "失敗") body = `<div class="pb-foot"><span style="color:var(--bad)">${esc(p.error)}</span><button data-retry="${p.id}">もう一度</button></div>`;
     else if (p.items && !p.items.length) body = `<div class="pb-foot"><span class="muted">値札が見つかりませんでした。値札が正面から写るように撮り直してください。</span></div>`;
     else if (p.items) body = `
