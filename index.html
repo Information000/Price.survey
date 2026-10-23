@@ -657,13 +657,8 @@ $("store").addEventListener("change", () => store("cps-store", $("store").value)
   const d = new Date(); $("surveyDate").value = new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString().slice(0,10);
   $("competitor").value = load("cps-competitor") || ""; $("store").value = load("cps-store") || "";
   try { const s = JSON.parse(load(STORE_KEY) || "null"); if (Array.isArray(s)) state.ledger = s; } catch(e){}
-  if (!state.ledger.length){
-    // 表示例（最初の登録で自動的に消えます。CSVには出力されません）
-    state.ledger = [
-      fillTax({ id:"ex1", example:true, date:"2026-10-24", competitor:"ケーズデンキ", store:"（例）", category:"エアコン", maker:"日立", model:"RAS-XR40260(W)", name:"白くまくん Xシリーズ", year:"2026年モデル", spec:"14畳用 4.0kW", price_ex:349800, price_in:384780, sale_ex:279800, sale_in:307780, sale_period:"10/24(土)〜10/30(金)", install:"工事代別", warranty:"10年間無料保証", perks:"エアコンセール特典1〜7対象", confidence:"high" }),
-      fillTax({ id:"ex2", example:true, date:"2026-10-24", competitor:"ケーズデンキ", store:"（例）", category:"エアコン", maker:"日立", model:"RAS-XR56260(W)", name:"白くまくん Xシリーズ", year:"2026年モデル", spec:"18畳用 5.6kW", price_ex:369800, price_in:406780, sale_ex:299800, sale_in:329780, sale_period:"10/24(土)〜10/30(金)", install:"工事代別", warranty:"10年間無料保証", perks:"エアコンセール特典1〜7対象", confidence:"medium" })
-    ];
-  }
+  // 以前の版で入っていた表示例を取り除く
+  if (state.ledger.some(r => r.example)){ state.ledger = state.ledger.filter(r => !r.example); saveLedger(); }
   renderThumbs(); renderResults(); renderLedger(); updateRun();
   initEngine();
 })();
