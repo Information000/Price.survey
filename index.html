@@ -391,7 +391,7 @@ async function initEngine(){
 
 async function askJSON(prompt, blobs, signal){
   if (state.engine.kind === "claude")
-    return state.sample.json(prompt, { images: blobs, signal, modelTier: "complex" });
+    return state.sample.json(prompt, { images: blobs, signal });
   const key = $("apiKey").value.trim();
   if (!key) throw { code:"no_key", message:"APIキーを入力してください" };
   store(KEY_KEY, key);
@@ -411,7 +411,7 @@ const FATAL = ["cancelled","not_granted","no_key","http_401","sampling_disabled"
 
 // 写真1枚の読み取り：①札の位置を探す ②札ごとに切り出して拡大・補正 ③写真全体も細かい区画に分けて拡大・補正
 // ④すべての画像を読み、同じ札を何度も読んだ結果を多数決でまとめる
-async function extract(photo, ctx, signal){
+async function extract(photo, ctx, signal, onPartial = () => {}){
   const img = photo.img, W = img.naturalWidth, H = img.naturalHeight;
   // 小さめの写真は区画を1段細かくし、拡大の上限も上げる
   const n = Math.min(6, (Number($("density").value) || 4) + (photo.low ? 1 : 0));
@@ -436,7 +436,7 @@ async function extract(photo, ctx, signal){
   for (const b of await gridCrops(img, n, zoom)) jobs.push({ mode: "grid", blob: b });
 
   // 同じ種類の画像ごとにまとめて送る（2件ずつ並行）
-  const per = Math.max(1, Math.min(state.engine.maxCount, 8));
+  const per = Math.max(1, Math.min(state.engine.maxCount, 4));
   const batches = [];
   for (const mode of ["tags", "grid"]){
     const list = jobs.filter(j => j.mode === mode).map(j => j.blob);
@@ -452,7 +452,8 @@ async function extract(photo, ctx, signal){
         const data = await askJSON(readPrompt(ctx, b.blobs.length, b.mode), b.blobs, signal);
         const items = Array.isArray(data) ? data : (data && data.items) || [];
         items.forEach(it => entries.push({ ...it, _src: b.mode }));
-      } catch(e){ if (e && FATAL.includes(e.code)) throw e; failed++; lastErr = e; }
+        if (items.length) onPartial(mergeEntries(entries.map(x => ({ ...x })), ctx));
+      } catch(e){ if (e && FATAL.includes(e.code)) throw e; failed++; lastErr = e; photo.fails = (photo.fails || []).concat(e && e.code || "error"); }
       done++;
       setPhase(photo, `札を読んでいます（${done}/${batches.length}回目・画像${jobs.length}枚）`, done / batches.length);
     }
@@ -587,14 +588,15 @@ function updateRun(){
 let ctl = null;
 async function runAll(){
   const ctx = { competitor: $("competitor").value.trim(), store: $("store").value.trim(), date: $("surveyDate").value, category: $("category").value };
-  if (!ctx.competitor){ toast("競合店を入力してください"); $("competitor").focus(); $("competitor").scrollIntoView({ block: "center" }); return; }
+  if (!ctx.competitor) ctx.competitor = "（未入力）";
   state.busy = true; updateRun(); renderThumbs();
   for (const p of state.photos){
     if (p.status !== "待機" && p.status !== "失敗") continue;
     p.ctx = { ...ctx }; p.status = "読み取り中"; p.error = null; renderThumbs(); renderResults();
     ctl = new AbortController();
     try {
-      const items = await extract(p, ctx, ctl.signal);
+      p.fails = []; p.started = Date.now();
+      const items = await extract(p, ctx, ctl.signal, rows => addToLedger(p, rows, true));
       addToLedger(p, items);
       p.status = "完了";
     } catch(e){
@@ -615,7 +617,8 @@ function renderResults(){
     if (p.status === "待機") body = `<span class="muted">読み取り待ち</span>${p.low && !hideLowTip() ? `<div class="tipline">小さめの写真なので、拡大と補正を強めにかけて読み取ります。<button class="link" data-hidetip="1">次から表示しない</button></div>` : ""}`;
     else if (p.status === "読み取り中") body = `<div><span class="spinner"></span> ${esc(p.phase || "準備しています")}</div>
       <div class="bar"><i style="width:${Math.round((p.progress || 0) * 100)}%"></i></div>
-      <div class="small muted">1枚あたり2〜5分ほどかかります。 <button class="link" data-stop="1">中止</button></div>`;
+      <div class="small muted">${p.added ? `台帳に${p.added}件入りました（読み取りを続けて更新中）。` : "最初の結果が出るまで1〜2分ほどかかります。"}経過 ${elapsed(p)} ・ <button class="link" data-stop="1">中止</button></div>
+      ${p.fails && p.fails.length ? `<div class="small" style="color:var(--warn)">${p.fails.length}回の読み取りに失敗（${esc([...new Set(p.fails)].join("、"))}）。残りで続けています。</div>` : ""}`;
     else if (p.status === "失敗") body = `<span style="color:var(--bad)">${esc(p.error)}</span> <button data-retry="${p.id}">もう一度</button>`;
     else if (!p.added) body = `<span class="muted">値札が見つかりませんでした。値札が正面から大きく写るように撮り直してください。</span>`;
     else body = `<b>${p.added}件</b>を台帳に追加しました（画像${p.readCount || 0}枚に分けて読み取り）。${p.review ? `<span style="color:var(--bad)">要確認 ${p.review}件</span> は台帳の赤い行です。写真と見比べて、セルをクリックして直してください。` : "すべて複数回の読み取りで一致しました。"}`;
@@ -627,16 +630,16 @@ function renderResults(){
 
 /* ================= 台帳 ================= */
 function saveLedger(){ store(STORE_KEY, state.ledger); }
-function addToLedger(p, items){
+function addToLedger(p, items, partial){
   const rows = items.map(r => ({ id: uid(), date: p.ctx.date, competitor: p.ctx.competitor, store: p.ctx.store, photo: p.name, photoId: p.id,
     category: r.category || "", maker: r.maker || "", model: r.model || "", name: r.name || "", year: r.year || "", spec: r.spec || "",
     price_ex: r.price_ex, price_in: r.price_in, sale_ex: r.sale_ex, sale_in: r.sale_in, street_in: r.street_in,
     sale_period: r.sale_period || "", install: r.install || "", warranty: r.warranty || "", perks: r.perks || "", note: r.note || "",
     confidence: r.confidence || "medium", reads: r.reads || 1, createdAt: new Date().toISOString() }));
   p.added = rows.length; p.review = rows.filter(r => r.confidence === "low").length;
-  state.ledger = state.ledger.filter(r => !r.example).concat(rows);
+  state.ledger = state.ledger.filter(r => !r.example && r.photoId !== p.id).concat(rows);
   saveLedger(); renderLedger();
-  if (rows.length) toast(`${rows.length}件を台帳に追加しました`);
+  if (!partial && rows.length) toast(`${rows.length}件を台帳に追加しました`);
 }
 function filtered(){
   const c = $("fCat").value, cp = $("fComp").value, q = $("fText").value.trim().toLowerCase();
@@ -691,6 +694,8 @@ function editCell(td){
   const lowN = filtered().filter(x => x.confidence === "low").length;
   const s = $("stats").querySelector('span[style]'); if (s) s.innerHTML = lowN ? `要確認 <b>${lowN}</b> 件` : "";
 }
+function elapsed(p){ const s = Math.round((Date.now() - (p.started || Date.now())) / 1000); return `${Math.floor(s / 60)}分${String(s % 60).padStart(2, "0")}秒`; }
+setInterval(() => { if (state.photos.some(p => p.status === "読み取り中")) renderResults(); }, 1000);
 function hideLowTip(){ return load("cps-hide-lowtip") === "1"; }
 function zoomPhoto(id){
   const p = state.photos.find(x => x.id === id); if (!p) return;
