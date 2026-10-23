@@ -87,7 +87,15 @@ td input,td select{padding:4px 6px;font-size:13px}
 td input.n{font-family:var(--f-num);text-align:right;width:8.5em}
 td.r{text-align:right}
 .conf{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;border:1px solid currentColor;font-weight:700}
-.conf.high{color:var(--good)} .conf.medium{color:var(--warn)} .conf.low{color:var(--bad)}
+.conf.high{color:var(--good)} .conf.medium{color:var(--warn)} .conf.low{color:var(--bad)} .conf.ok{color:var(--accent)}
+td.ed{cursor:text;border-bottom:1px dashed var(--line)}
+td.ed:hover{background:var(--soft)}
+td.ed:focus{outline:2px solid var(--accent);outline-offset:-2px;background:var(--card)}
+td.acts{display:flex;gap:6px}
+.bar{height:6px;border-radius:3px;background:var(--soft);overflow:hidden;margin-block:6px}
+.bar i{display:block;height:100%;background:var(--accent);transition:width .3s}
+.warnline{color:var(--warn);margin-top:4px}
+.pb-head .t div{white-space:normal}
 tr.lowrow td{background:color-mix(in srgb,var(--bad) 7%,transparent)}
 .pb-foot{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 12px;flex-wrap:wrap}
 .spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite;vertical-align:-2px}
@@ -148,7 +156,14 @@ tr.lowrow td{background:color-mix(in srgb,var(--bad) 7%,transparent)}
       </div>
       <div class="thumbs" id="thumbs"></div>
 
-      <label class="check"><input type="checkbox" id="hires" checked> 2段階読み取り（札の位置を探してから1枚ずつ拡大して読む・推奨）</label>
+      <label class="f">読み取りの細かさ（細かいほど正確・時間がかかります）
+        <select id="density">
+          <option value="3">標準（札ごと＋写真を9区画に拡大）</option>
+          <option value="4" selected>細かい（札ごと＋写真を16区画に拡大）</option>
+          <option value="5">最大（札ごと＋写真を25区画に拡大）</option>
+        </select>
+      </label>
+      <div class="note">写真は自動で明るさ・輪郭を補正し、札ごと・区画ごとに拡大して何度も読み取ります。同じ札を複数回読んだ結果を多数決でまとめ、一致しなかったものは「要確認」にします。</div>
 
       <div class="apikey" id="apiBox" hidden>
         <label class="f">Anthropic APIキー（このHTMLを単体で開いた場合のみ必要）
@@ -157,18 +172,18 @@ tr.lowrow td{background:color-mix(in srgb,var(--bad) 7%,transparent)}
         <div class="note">キーはこのブラウザの中だけに保存されます。社内配布時はキーの管理ルールに従ってください。</div>
       </div>
 
-      <button class="primary" id="runBtn" disabled>写真を読み取る</button>
+      <button class="primary" id="runBtn" disabled>写真を読み取って台帳に追加</button>
       <div class="note">撮影のコツ：値札が正面から写るように、1枚に2〜6台程度。<b>LINEで送った写真は画質が落ち、型番が読めなくなります。</b>カメラの元の写真を使うか、LINEなら「オリジナル画質」で送ってください。</div>
     </section>
 
     <!-- 右：読み取り結果 -->
     <section class="panel" aria-labelledby="h-review">
       <div class="panel-head">
-        <h2 id="h-review">2. 読み取り結果を確認</h2>
-        <span class="small muted">赤い行は読み取りに自信がない行です。写真と見比べて直してください。</span>
+        <h2 id="h-review">2. 読み取り状況</h2>
+        <span class="small muted">読み取った商品は自動で調査台帳に入ります。</span>
       </div>
       <div class="results" id="results">
-        <div class="empty" id="resultsEmpty">写真を読み取ると、値札ごとの行がここに並びます。<br>内容を直してから「台帳に追加」を押してください。</div>
+        
       </div>
     </section>
   </div>
@@ -193,7 +208,7 @@ tr.lowrow td{background:color-mix(in srgb,var(--bad) 7%,transparent)}
       <table id="ledger">
         <thead><tr>
           <th>調査日</th><th>競合店</th><th>店舗</th><th>カテゴリ</th><th>メーカー</th><th>型番</th><th>主要スペック</th>
-          <th class="r">表示価格(税込)</th><th class="r">特価(税込)</th><th class="r">実売(税込)</th><th>特価期間</th><th>特典・工事・保証</th><th>信頼度</th><th></th>
+          <th class="r">表示価格(税込)</th><th class="r">特価(税込)</th><th class="r">実売(税込)</th><th>特価期間</th><th>特典・工事・保証</th><th>備考</th><th>信頼度</th><th></th>
         </tr></thead>
         <tbody id="ledgerBody"></tbody>
       </table>
@@ -260,25 +275,53 @@ function fillTax(it){
   return it;
 }
 
-/* ================= 画像の準備 ================= */
+/* ================= 画像の準備（切り出し・拡大・補正） ================= */
 function loadImage(file){
   return new Promise((res, rej) => { const url = URL.createObjectURL(file); const img = new Image();
     img.onload = () => res({ img, url }); img.onerror = () => rej(new Error("画像を開けませんでした")); img.src = url; });
 }
-// 切り出して、読み取り側の上限（約1.15メガピクセル）いっぱいまで拡大・縮小する
-function cropFit(img, sx, sy, sw, sh, targetPx = 1150000, maxUp = 3){
+// 明るさの幅を広げ（自動レベル補正）、輪郭を立てる（アンシャープマスク）
+function enhance(g, w, h){
+  const d = g.getImageData(0, 0, w, h), p = d.data, n = w * h;
+  const hist = new Uint32Array(256);
+  for (let i = 0; i < p.length; i += 4) hist[(p[i] * 77 + p[i + 1] * 150 + p[i + 2] * 29) >> 8]++;
+  let lo = 0, hi = 255, acc = 0;
+  while (lo < 254 && (acc += hist[lo]) < n * 0.005) lo++;
+  acc = 0; while (hi > lo + 1 && (acc += hist[hi]) < n * 0.005) hi--;
+  const sc = 255 / Math.max(1, hi - lo), lut = new Uint8ClampedArray(256);
+  for (let v = 0; v < 256; v++) lut[v] = (v - lo) * sc;
+  for (let i = 0; i < p.length; i += 4){ p[i] = lut[p[i]]; p[i + 1] = lut[p[i + 1]]; p[i + 2] = lut[p[i + 2]]; }
+  const src = new Uint8ClampedArray(p), R = w * 4, amt = 0.9;
+  for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++){
+    const o = y * R + x * 4;
+    for (let c = 0; c < 3; c++){
+      const i = o + c;
+      const blur = (src[i - R - 4] + src[i - R] + src[i - R + 4] + src[i - 4] + src[i] + src[i + 4] + src[i + R - 4] + src[i + R] + src[i + R + 4]) / 9;
+      p[i] = src[i] + amt * (src[i] - blur);
+    }
+  }
+  g.putImageData(d, 0, 0);
+}
+// 切り出して、読み取り側の上限（約1.15メガピクセル）いっぱいまで拡大し、補正をかける
+function cropFit(img, sx, sy, sw, sh, opt = {}){
+  const targetPx = opt.targetPx || 1150000, maxUp = opt.maxUp || 4;
   sx = Math.max(0, Math.round(sx)); sy = Math.max(0, Math.round(sy));
-  sw = Math.min(img.naturalWidth - sx, Math.round(sw)); sh = Math.min(img.naturalHeight - sy, Math.round(sh));
+  sw = Math.max(8, Math.min(img.naturalWidth - sx, Math.round(sw))); sh = Math.max(8, Math.min(img.naturalHeight - sy, Math.round(sh)));
   const s = Math.min(maxUp, Math.sqrt(targetPx / (sw * sh)));
   const c = document.createElement("canvas"); c.width = Math.max(1, Math.round(sw * s)); c.height = Math.max(1, Math.round(sh * s));
-  const g = c.getContext("2d"); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = "high";
+  const g = c.getContext("2d", { willReadFrequently: true }); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = "high";
   g.drawImage(img, sx, sy, sw, sh, 0, 0, c.width, c.height);
+  if (opt.enhance !== false) { try { enhance(g, c.width, c.height); } catch(e){} }
   return new Promise(r => c.toBlob(b => r(b), "image/jpeg", 0.92));
 }
-// 予備：重なりのある3×3分割
-async function gridCrops(img){
-  const W = img.naturalWidth, H = img.naturalHeight, tw = W * 0.42, th = H * 0.42, out = [];
-  for (const fy of [0, 0.5, 1]) for (const fx of [0, 0.5, 1]) out.push(await cropFit(img, (W - tw) * fx, (H - th) * fy, tw, th));
+// 写真をn×nの区画に分ける（隣と35%重ねて、札が区画の境目で切れても別の区画で読めるようにする）
+async function gridCrops(img, n){
+  const W = img.naturalWidth, H = img.naturalHeight, ov = 0.35;
+  const tw = W / (n - (n - 1) * ov), th = H / (n - (n - 1) * ov), out = [];
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++){
+    const fx = n === 1 ? 0 : x / (n - 1), fy = n === 1 ? 0 : y / (n - 1);
+    out.push(await cropFit(img, (W - tw) * fx, (H - th) * fy, tw, th));
+  }
   return out;
 }
 const blobToB64 = (b) => new Promise(r => { const fr = new FileReader(); fr.onload = () => r(String(fr.result).split(",")[1]); fr.readAsDataURL(b); });
@@ -296,8 +339,8 @@ function readPrompt(ctx, n, mode){
   const catRule = ctx.category ? `category はすべて "${ctx.category}"。` : `category は次のどれか：${CATS.join("、")}。該当しなければ "その他"。`;
   const specHints = Object.entries(SPEC_HINT).map(([k,v]) => `・${k}：${v}`).join("\n");
   const how = mode === "tags"
-    ? `添付の画像${n}枚は、同じ売場写真から札を1枚ずつ切り出して拡大したものです（1枚目＝image 1）。各画像の中心にある札を読んでください。端に隣の札が写っていても、型番と価格の両方が読めるなら読んでかまいません。`
-    : `添付の画像${n}枚は、同じ売場写真を重なりのある9区画に分けて拡大したものです。各画像に写っている札を読んでください。画像の端で切れて型番も価格も読めない札は無視してください（隣の画像に写っています）。同じ札が複数の画像に写っていても、それぞれ書き出してかまいません。`;
+    ? `添付の画像${n}枚は、同じ売場写真から札を1枚ずつ切り出し、拡大・補正したものです（1枚目＝image 1）。各画像の中心にある札を読んでください。端に隣の札が写っていても、型番と価格の両方が読めるなら読んでかまいません。`
+    : `添付の画像${n}枚は、同じ売場写真を重なりのある区画に分けて拡大・補正したものです。各画像に写っている札を読んでください。画像の端で切れて型番も価格も読めない札は無視してください（隣の画像に写っています）。同じ札が複数の画像に写っていても、それぞれ書き出してかまいません。`;
   return `あなたは家電量販店の競合店価格調査の担当です。競合店：${ctx.competitor || "不明"}。
 ${how}
 
@@ -364,97 +407,143 @@ async function askJSON(prompt, blobs, signal){
   const m = text.match(/\{[\s\S]*\}/); if (!m) throw { code:"invalid_json", message:"結果を読み取れませんでした" };
   return JSON.parse(m[0]);
 }
+const FATAL = ["cancelled","not_granted","no_key","http_401","sampling_disabled","session_expired"];
 
-// 写真1枚の読み取り：①札の位置を探す → ②札ごとに切り出し拡大して読む → ③型番ごとにまとめる
+// 写真1枚の読み取り：①札の位置を探す ②札ごとに切り出して拡大・補正 ③写真全体も細かい区画に分けて拡大・補正
+// ④すべての画像を読み、同じ札を何度も読んだ結果を多数決でまとめる
 async function extract(photo, ctx, signal){
   const img = photo.img, W = img.naturalWidth, H = img.naturalHeight;
-  const twoStage = $("hires").checked;
-  let crops = [], mode = "grid";
-  if (twoStage){
-    setPhase(photo, "札の位置を探しています");
-    try {
-      const loc = await askJSON(LOCATE_PROMPT, [await cropFit(img, 0, 0, W, H, 1150000, 1)], signal);
-      const boxes = ((loc && loc.tags) || []).map(t => t && t.box).filter(b => Array.isArray(b) && b.length === 4 && b.every(n => isFinite(n)));
-      for (const b of boxes.slice(0, 40)){
-        let [x0, y0, x1, y1] = b.map(Number);
-        if (x1 < x0) [x0, x1] = [x1, x0];
-        if (y1 < y0) [y0, y1] = [y1, y0];
-        const bw = (x1 - x0) / 1000 * W, bh = (y1 - y0) / 1000 * H;
-        const pad = Math.max(bw, bh) * 0.25 + Math.min(W, H) * 0.02;   // 位置のずれを見込んで余白を取る
-        crops.push(await cropFit(img, x0 / 1000 * W - pad, y0 / 1000 * H - pad, bw + pad * 2, bh + pad * 2));
-      }
-      if (crops.length) mode = "tags";
-    } catch(e){ if (e && ["cancelled","not_granted","no_key","http_401","rate_limited"].includes(e.code)) throw e; }
-  }
-  if (!crops.length) crops = await gridCrops(img);
+  const n = Number($("density").value) || 4;
+  const jobs = [];   // {mode, blob}
 
-  const per = Math.max(1, Math.min(state.engine.maxCount, 12));
-  const entries = [];
-  for (let i = 0; i < crops.length; i += per){
-    const batch = crops.slice(i, i + per);
-    setPhase(photo, `札を読んでいます（${Math.min(i + per, crops.length)}/${crops.length}枚目）`);
-    const data = await askJSON(readPrompt(ctx, batch.length, mode), batch, signal);
-    const items = Array.isArray(data) ? data : (data && data.items) || [];
-    items.forEach(it => entries.push({ ...it, image: (Number(it.image) || 1) + i }));
+  setPhase(photo, "札の位置を探しています", 0);
+  try {
+    const loc = await askJSON(LOCATE_PROMPT, [await cropFit(img, 0, 0, W, H, { maxUp: 1, enhance: false })], signal);
+    const boxes = ((loc && loc.tags) || []).map(t => t && t.box).filter(b => Array.isArray(b) && b.length === 4 && b.every(v => isFinite(v)));
+    for (const b of boxes.slice(0, 40)){
+      let [x0, y0, x1, y1] = b.map(Number);
+      if (x1 < x0) [x0, x1] = [x1, x0];
+      if (y1 < y0) [y0, y1] = [y1, y0];
+      const bw = (x1 - x0) / 1000 * W, bh = (y1 - y0) / 1000 * H;
+      const pad = Math.max(bw, bh) * 0.15 + Math.min(W, H) * 0.015;   // 位置のずれを見込んだ余白
+      jobs.push({ mode: "tags", blob: await cropFit(img, x0 / 1000 * W - pad, y0 / 1000 * H - pad, bw + pad * 2, bh + pad * 2) });
+    }
+  } catch(e){ if (e && FATAL.includes(e.code)) throw e; }
+
+  setPhase(photo, `写真を${n}×${n}区画に分けて拡大しています`, 0);
+  for (const b of await gridCrops(img, n)) jobs.push({ mode: "grid", blob: b });
+
+  // 同じ種類の画像ごとにまとめて送る（2件ずつ並行）
+  const per = Math.max(1, Math.min(state.engine.maxCount, 8));
+  const batches = [];
+  for (const mode of ["tags", "grid"]){
+    const list = jobs.filter(j => j.mode === mode).map(j => j.blob);
+    for (let i = 0; i < list.length; i += per) batches.push({ mode, blobs: list.slice(i, i + per) });
   }
+  const entries = []; let done = 0, failed = 0, lastErr = null;
+  setPhase(photo, `札を読んでいます（画像${jobs.length}枚）`, 0);
+  let next = 0;
+  async function worker(){
+    while (next < batches.length){
+      const b = batches[next++];
+      try {
+        const data = await askJSON(readPrompt(ctx, b.blobs.length, b.mode), b.blobs, signal);
+        const items = Array.isArray(data) ? data : (data && data.items) || [];
+        items.forEach(it => entries.push({ ...it, _src: b.mode }));
+      } catch(e){ if (e && FATAL.includes(e.code)) throw e; failed++; lastErr = e; }
+      done++;
+      setPhase(photo, `札を読んでいます（${done}/${batches.length}回目・画像${jobs.length}枚）`, done / batches.length);
+    }
+  }
+  await Promise.all([worker(), worker()]);
+  if (!entries.length && failed) throw lastErr;
+  photo.readCount = jobs.length;
   return mergeEntries(entries, ctx);
 }
 
-/* ================= 型番ごとにまとめる ================= */
-const normModel = (s) => String(s || "").normalize("NFKC").toUpperCase().replace(/\s+/g, "");
+/* ================= 多数決でまとめる ================= */
+const normModel = (s) => String(s || "").normalize("NFKC").toUpperCase().replace(/\s+/g, "").replace(/（/g, "(").replace(/）/g, ")");
 const groupKey = (s) => normModel(s).replace(/\([A-Z0-9]{1,3}\)$/, "");   // 色記号の有無は同じ商品として扱う
+// 見間違えやすい文字を同じものとみなす（0/D/O、8/B、5/S、1/I/L、2/Z、6/G）
+const LOOKALIKE = { O:"0", D:"0", Q:"0", B:"8", S:"5", I:"1", L:"1", Z:"2", G:"6" };
+const fuzzyKey = (s) => groupKey(s).replace(/[ODQBSILZG]/g, c => LOOKALIKE[c]).replace(/\?/g, "");
 const CONF_RANK = { high: 3, medium: 2, low: 1 };
-const worst = (...cs) => cs.filter(Boolean).sort((a, b) => (CONF_RANK[a] || 2) - (CONF_RANK[b] || 2))[0] || "medium";
+const taxOK = (ex, inc) => ex && inc && Math.abs(Math.floor(ex * 1.1) - inc) <= 2;
+
+function tally(values){
+  const m = new Map();
+  for (const v of values) if (v != null && v !== "") m.set(v, (m.get(v) || 0) + 1);
+  return [...m.entries()].sort((a, b) => b[1] - a[1]);
+}
+// 税抜・税込それぞれ多数決し、10%で合う組み合わせを優先する
+function votePrice(list){
+  const exs = tally(list.map(e => e.price_ex)).slice(0, 4), ins = tally(list.map(e => e.price_in)).slice(0, 4);
+  let best = null;
+  for (const [ex, a] of exs) for (const [inc, b] of ins) if (taxOK(ex, inc) && (!best || a + b > best.votes)) best = { ex, inc, votes: a + b, ok: true };
+  if (!best){
+    const ex = exs[0], inc = ins[0];
+    if (!ex && !inc) return null;
+    best = { ex: ex ? ex[0] : null, inc: inc ? inc[0] : null, ok: !(ex && inc) };
+  }
+  // 何回の読み取りがこの価格を支持したか
+  best.votes = list.filter(e => (best.ex && e.price_ex === best.ex) || (best.inc && e.price_in === best.inc)).length;
+  return best;
+}
 
 function mergeEntries(entries, ctx){
-  const groups = new Map(), installs = new Set(), orphans = [];
+  const groups = new Map(), installs = [], orphans = [];
   for (const e of entries){
     e.price_ex = toNum(e.price_ex); e.price_in = toNum(e.price_in);
-    if (e.kind === "工事費"){ if (e.install) installs.add(String(e.install)); continue; }
-    const k = groupKey(e.model);
-    if (!k || k.replace(/\?/g, "").length < 4){ if (e.price_ex || e.price_in) orphans.push(e); continue; }
+    if (e.kind === "工事費"){ if (e.install) installs.push(String(e.install).trim()); continue; }
+    const k = fuzzyKey(e.model);
+    if (!k || k.length < 4){ if (e.price_ex || e.price_in) orphans.push(e); continue; }
     if (!groups.has(k)) groups.set(k, []);
     groups.get(k).push(e);
   }
-  const pick = (list, f) => { for (const e of list) if (e[f] != null && String(e[f]).trim() !== "") return String(e[f]).trim(); return ""; };
-  const distinct = (arr) => [...new Map(arr.map(e => [(e.price_ex || 0) + "/" + (e.price_in || 0), e])).values()];
+  const top = (list, f) => { const t = tally(list.map(e => e[f] == null ? "" : String(e[f]).trim())); return t.length ? t[0][0] : ""; };
   const rows = [];
   for (const list of groups.values()){
     const notes = [];
-    const models = list.map(e => normModel(e.model)).sort((a, b) => b.length - a.length);
-    const reg = distinct(list.filter(e => e.kind !== "期間特価" && (e.price_ex || e.price_in)));
-    const sal = distinct(list.filter(e => e.kind === "期間特価" && (e.price_ex || e.price_in)));
-    if (reg.length > 1) notes.push("店頭価格の読みが複数：" + reg.map(e => [yen(e.price_ex), yen(e.price_in)].filter(Boolean).join("・")).join(" / "));
-    if (sal.length > 1) notes.push("特価の読みが複数：" + sal.map(e => [yen(e.price_ex), yen(e.price_in)].filter(Boolean).join("・")).join(" / "));
-    if (new Set(models).size > 1) notes.push("型番の読みが揺れています：" + [...new Set(list.map(e => e.model))].join(" / "));
-    const r = reg[0], sv = sal[0];
-    const it = {
-      category: ctx.category || pick(list, "category"), maker: pick(list, "maker"),
-      model: (list.find(e => normModel(e.model) === models[0]) || {}).model || models[0],
-      name: pick(list, "name"), year: pick(list, "year"), spec: pick(list, "spec"),
-      price_ex: r ? r.price_ex : null, price_in: r ? r.price_in : null,
-      sale_ex: sv ? sv.price_ex : null, sale_in: sv ? sv.price_in : null, sale_period: sv ? (sv.period || "") : "",
-      install: pick(list, "install"), warranty: pick(list, "warranty"), perks: pick(list, "perks"),
-      note: [pick(list, "note"), ...notes].filter(Boolean).join("／"),
-      confidence: worst(...list.filter(e => e.price_ex || e.price_in).map(e => e.confidence), notes.length ? "medium" : null),
-      _id: uid(), _keep: !!(r || sv)
-    };
-    if (!r && !sv) { it.note = ["価格の札が見つかりませんでした", it.note].filter(Boolean).join("／"); it.confidence = "low"; }
-    if (/\?/.test(it.model)) it.confidence = worst(it.confidence, "medium");
-    rows.push(it);
+    // 型番：「?」を含まない読みを優先して多数決
+    const spellings = tally(list.map(e => normModel(e.model)));
+    const clean = spellings.filter(([m]) => !m.includes("?"));
+    const model = (clean[0] || spellings[0])[0];
+    if (spellings.length > 1) notes.push("型番の読み：" + spellings.map(([m, c]) => `${m}×${c}`).join("、"));
+    const reg = votePrice(list.filter(e => e.kind !== "期間特価" && (e.price_ex || e.price_in)));
+    const salList = list.filter(e => e.kind === "期間特価" && (e.price_ex || e.price_in));
+    const sal = votePrice(salList);
+    const priced = list.filter(e => e.price_ex || e.price_in);
+    const reads = Math.max(reg ? reg.votes : 0, sal ? sal.votes : 0);
+    let confidence = "medium";
+    if ((reg && !reg.ok) || (sal && !sal.ok)) confidence = "low";
+    else if (reads >= 2 && clean.length && (clean[0][1] >= 2 || spellings.length === 1)) confidence = "high";
+    else if (priced.length && priced.every(e => e.confidence === "high") && !model.includes("?")) confidence = "high";
+    if (model.includes("?") && confidence === "high") confidence = "medium";
+    if (!reg && !sal) continue;   // 価格の札が見つからない商品は台帳に入れない
+    rows.push({
+      category: ctx.category || top(list, "category"), maker: top(list, "maker"), model,
+      name: top(list, "name"), year: top(list, "year"), spec: top(list, "spec"),
+      price_ex: reg ? reg.ex : null, price_in: reg ? reg.inc : null,
+      sale_ex: sal ? sal.ex : null, sale_in: sal ? sal.inc : null, sale_period: sal ? top(salList, "period") : "",
+      install: top(list, "install"), warranty: top(list, "warranty"), perks: top(list, "perks"),
+      note: [...notes, top(list, "note")].filter(Boolean).join("／"), reads, confidence
+    });
   }
   for (const e of orphans){
     const isSale = e.kind === "期間特価";
     rows.push({ category: ctx.category || e.category || "", maker: e.maker || "", model: "", name: e.name || "", spec: e.spec || "",
       price_ex: isSale ? null : e.price_ex, price_in: isSale ? null : e.price_in,
       sale_ex: isSale ? e.price_ex : null, sale_in: isSale ? e.price_in : null, sale_period: e.period || "",
-      note: "型番が読めませんでした", confidence: "low", _id: uid(), _keep: false });
+      note: "型番が読めませんでした", reads: 1, confidence: "low" });
   }
-  const inst = [...installs].join(" / ");
-  rows.forEach(it => { if (inst && !it.install) it.install = inst; fillTax(it); });
-  return rows.sort((a, b) => (!a.model) - (!b.model) || String(a.model).localeCompare(String(b.model)));
+  // 同じ価格だけの「型番なし」行は、型番つきの行と重なっていれば捨てる
+  const known = new Set(rows.filter(r => r.model).flatMap(r => [r.price_ex, r.price_in, r.sale_ex, r.sale_in].filter(Boolean)));
+  const out = rows.filter(r => r.model || ![r.price_ex, r.price_in, r.sale_ex, r.sale_in].some(v => v && known.has(v)));
+  const inst = tally(installs)[0];
+  out.forEach(it => { if (inst && !it.install) it.install = inst[0]; fillTax(it); });
+  return out.sort((a, b) => (!a.model) - (!b.model) || String(a.model).localeCompare(String(b.model)));
 }
-function setPhase(photo, text){ photo.phase = text; renderResults(); }
+function setPhase(photo, text, frac){ photo.phase = text; photo.progress = frac; renderResults(); }
 
 function errText(e){
   const c = e && e.code;
@@ -475,10 +564,11 @@ async function addFiles(files){
   for (const f of files){
     if (!f.type.startsWith("image/")) continue;
     try { const { img, url } = await loadImage(f);
-      state.photos.push({ id: uid(), name: f.name, img, url, status:"待機", items: null, error: null });
+      const low = Math.max(img.naturalWidth, img.naturalHeight) < 2000;
+      state.photos.push({ id: uid(), name: f.name, img, url, status:"待機", low, added: 0, review: 0, error: null });
     } catch(e){ toast(f.name + " を開けませんでした"); }
   }
-  renderThumbs(); updateRun();
+  renderThumbs(); renderResults(); updateRun();
 }
 function renderThumbs(){
   $("thumbs").innerHTML = state.photos.map(p => `
@@ -487,100 +577,121 @@ function renderThumbs(){
       <button data-rm="${p.id}" aria-label="${esc(p.name)} を外す" ${state.busy?"disabled":""}>×</button></div>`).join("");
 }
 function updateRun(){
-  const pending = state.photos.filter(p => p.status !== "完了").length;
+  const pending = state.photos.filter(p => p.status === "待機" || p.status === "失敗").length;
   $("runBtn").disabled = state.busy || !state.engine || pending === 0;
-  $("runBtn").innerHTML = state.busy ? '<span class="spinner"></span> 読み取り中…' : (pending ? `写真を読み取る（${pending}枚）` : "写真を読み取る");
+  $("runBtn").innerHTML = state.busy ? '<span class="spinner"></span> 読み取り中…' : (pending ? `写真を読み取って台帳に追加（${pending}枚）` : "写真を読み取って台帳に追加");
 }
 
 let ctl = null;
 async function runAll(){
   const ctx = { competitor: $("competitor").value.trim(), store: $("store").value.trim(), date: $("surveyDate").value, category: $("category").value };
-  if (!ctx.competitor){ toast("競合店を入力してください"); $("competitor").focus(); return; }
+  if (!ctx.competitor){ toast("競合店を入力してください"); $("competitor").focus(); $("competitor").scrollIntoView({ block: "center" }); return; }
   state.busy = true; updateRun(); renderThumbs();
   for (const p of state.photos){
-    if (p.status === "完了") continue;
+    if (p.status !== "待機" && p.status !== "失敗") continue;
     p.ctx = { ...ctx }; p.status = "読み取り中"; p.error = null; renderThumbs(); renderResults();
     ctl = new AbortController();
-    try { p.items = await extract(p, ctx, ctl.signal); p.status = "完了"; }
-    catch(e){ p.status = "失敗"; p.error = errText(e); if (e && (e.code === "not_granted" || e.code === "no_key")) { renderThumbs(); renderResults(); break; } }
+    try {
+      const items = await extract(p, ctx, ctl.signal);
+      addToLedger(p, items);
+      p.status = "完了";
+    } catch(e){
+      p.status = "失敗"; p.error = errText(e);
+      if (e && FATAL.includes(e.code)) { renderThumbs(); renderResults(); break; }
+    }
     renderThumbs(); renderResults();
   }
   state.busy = false; updateRun(); renderThumbs();
 }
 
-/* ================= 読み取り結果（編集） ================= */
-const EDIT_COLS = [
-  ["category","カテゴリ","sel"],["maker","メーカー"],["model","型番"],["name","商品名・シリーズ"],["year","年式"],["spec","主要スペック"],
-  ["price_ex","表示(税抜)","n"],["price_in","表示(税込)","n"],["sale_ex","特価(税抜)","n"],["sale_in","特価(税込)","n"],["sale_period","特価期間"],
-  ["install","工事費"],["warranty","保証"],["perks","特典・POP"],["note","備考"]
-];
+/* ================= 読み取り状況 ================= */
 function renderResults(){
   const box = $("results");
-  const shown = state.photos.filter(p => p.status !== "待機");
-  if (!shown.length){ box.innerHTML = `<div class="empty">写真を読み取ると、値札ごとの行がここに並びます。<br>内容を直してから「台帳に追加」を押してください。</div>`; return; }
-  box.innerHTML = shown.map(p => {
+  if (!state.photos.length){ box.innerHTML = `<div class="empty">写真を入れて「写真を読み取って台帳に追加」を押すと、<br>読み取った商品が自動で下の調査台帳に入ります。</div>`; return; }
+  box.innerHTML = state.photos.map(p => {
     let body = "";
-    if (p.status === "読み取り中") body = `<div class="pb-foot"><span><span class="spinner"></span> ${esc(p.phase || "準備しています")}（1枚あたり1〜3分ほど）</span><button data-stop="1">中止</button></div>`;
-    else if (p.status === "失敗") body = `<div class="pb-foot"><span style="color:var(--bad)">${esc(p.error)}</span><button data-retry="${p.id}">もう一度</button></div>`;
-    else if (p.items && !p.items.length) body = `<div class="pb-foot"><span class="muted">値札が見つかりませんでした。値札が正面から写るように撮り直してください。</span></div>`;
-    else if (p.items) body = `
-      <div class="scroll"><table><thead><tr><th>追加</th><th>信頼度</th>${EDIT_COLS.map(c=>`<th>${c[1]}</th>`).join("")}<th></th></tr></thead><tbody>
-      ${p.items.map(it => `<tr class="${it.confidence==="low"?"lowrow":""}" data-pid="${p.id}" data-iid="${it._id}">
-        <td><input type="checkbox" data-k="_keep" ${it._keep?"checked":""} aria-label="この行を追加"></td>
-        <td><span class="conf ${esc(it.confidence||"medium")}">${({high:"高",medium:"中",low:"低"})[it.confidence]||"中"}</span></td>
-        ${EDIT_COLS.map(([k,l,t]) => t==="sel"
-          ? `<td><select data-k="${k}" aria-label="${l}">${[...CATS,"その他"].map(c=>`<option ${c===it[k]?"selected":""}>${c}</option>`).join("")}</select></td>`
-          : `<td><input data-k="${k}" ${t==="n"?'class="n" inputmode="numeric"':""} value="${esc(it[k]??"")}" aria-label="${l}" ${t==="n"&&it._calc&&it._calc.includes(k)?'title="もう一方の価格から計算した値です"':""} style="${t?"":`width:${k==="spec"||k==="perks"?"14em":k==="model"?"11em":"8em"}`}"></td>`).join("")}
-        <td><button data-del="${p.id}:${it._id}" aria-label="行を削除">削除</button></td></tr>`).join("")}
-      </tbody></table></div>
-      <div class="pb-foot"><span class="small muted">${p.items.length}件読み取り ・ 税抜/税込の片方だけ読めた場合はもう一方を10%で計算しています</span>
-        <span style="display:flex;gap:8px"><button data-add-row="${p.id}">行を追加</button><button class="primary" data-commit="${p.id}">台帳に追加</button></span></div>`;
-    return `<div class="photo-block"><div class="pb-head"><img src="${p.url}" alt="" data-zoom="${p.id}">
-      <div class="t"><div><b>${esc(p.name)}</b></div><div class="small muted">${esc((p.ctx&&p.ctx.competitor)||"")} ${esc((p.ctx&&p.ctx.store)||"")} ・ ${esc((p.ctx&&p.ctx.date)||"")}</div></div>
-      <span class="small">${esc(p.status)}</span></div>${body}</div>`;
+    if (p.status === "待機") body = `<span class="muted">読み取り待ち</span>${p.low ? `<div class="warnline">この写真は画質が低めです（長辺${Math.max(p.img.naturalWidth, p.img.naturalHeight)}px）。型番を読み違えやすいので、カメラの元の写真があればそちらを使ってください。</div>` : ""}`;
+    else if (p.status === "読み取り中") body = `<div><span class="spinner"></span> ${esc(p.phase || "準備しています")}</div>
+      <div class="bar"><i style="width:${Math.round((p.progress || 0) * 100)}%"></i></div>
+      <div class="small muted">1枚あたり2〜5分ほどかかります。 <button class="link" data-stop="1">中止</button></div>`;
+    else if (p.status === "失敗") body = `<span style="color:var(--bad)">${esc(p.error)}</span> <button data-retry="${p.id}">もう一度</button>`;
+    else if (!p.added) body = `<span class="muted">値札が見つかりませんでした。値札が正面から大きく写るように撮り直してください。</span>`;
+    else body = `<b>${p.added}件</b>を台帳に追加しました（画像${p.readCount || 0}枚に分けて読み取り）。${p.review ? `<span style="color:var(--bad)">要確認 ${p.review}件</span> は台帳の赤い行です。写真と見比べて、セルをクリックして直してください。` : "すべて複数回の読み取りで一致しました。"}`;
+    return `<div class="photo-block"><div class="pb-head"><img src="${p.url}" alt="${esc(p.name)}を拡大" data-zoom="${p.id}">
+      <div class="t"><div><b>${esc(p.name)}</b> <span class="small muted">${p.img.naturalWidth}×${p.img.naturalHeight}px</span></div>
+      <div class="small">${body}</div></div></div></div>`;
   }).join("");
 }
 
 /* ================= 台帳 ================= */
 function saveLedger(){ store(STORE_KEY, state.ledger); }
-function commit(pid){
-  const p = state.photos.find(x => x.id === pid); if (!p || !p.items) return;
-  const rows = p.items.filter(it => it._keep).map(it => {
-    const r = fillTax({ ...it });
-    return { id: uid(), date: p.ctx.date, competitor: p.ctx.competitor, store: p.ctx.store, photo: p.name,
-      category: r.category, maker: r.maker||"", model: r.model||"", name: r.name||"", year: r.year||"", spec: r.spec||"",
-      price_ex: r.price_ex, price_in: r.price_in, sale_ex: r.sale_ex, sale_in: r.sale_in, street_in: r.street_in,
-      sale_period: r.sale_period||"", install: r.install||"", warranty: r.warranty||"", perks: r.perks||"", note: r.note||"",
-      confidence: r.confidence||"medium", createdAt: new Date().toISOString() };
-  });
-  if (!rows.length){ toast("追加する行にチェックを入れてください"); return; }
+function addToLedger(p, items){
+  const rows = items.map(r => ({ id: uid(), date: p.ctx.date, competitor: p.ctx.competitor, store: p.ctx.store, photo: p.name, photoId: p.id,
+    category: r.category || "", maker: r.maker || "", model: r.model || "", name: r.name || "", year: r.year || "", spec: r.spec || "",
+    price_ex: r.price_ex, price_in: r.price_in, sale_ex: r.sale_ex, sale_in: r.sale_in, street_in: r.street_in,
+    sale_period: r.sale_period || "", install: r.install || "", warranty: r.warranty || "", perks: r.perks || "", note: r.note || "",
+    confidence: r.confidence || "medium", reads: r.reads || 1, createdAt: new Date().toISOString() }));
+  p.added = rows.length; p.review = rows.filter(r => r.confidence === "low").length;
   state.ledger = state.ledger.filter(r => !r.example).concat(rows);
-  saveLedger();
-  state.photos = state.photos.filter(x => x.id !== pid);
-  renderThumbs(); renderResults(); renderLedger(); updateRun();
-  toast(rows.length + "件を台帳に追加しました");
+  saveLedger(); renderLedger();
+  if (rows.length) toast(`${rows.length}件を台帳に追加しました`);
 }
 function filtered(){
   const c = $("fCat").value, cp = $("fComp").value, q = $("fText").value.trim().toLowerCase();
   return state.ledger.filter(r => (!c || r.category === c) && (!cp || r.competitor === cp) &&
     (!q || (r.model + " " + r.maker + " " + r.name + " " + r.spec).toLowerCase().includes(q)));
 }
+const CONF_LABEL = { high:"高", medium:"中", low:"低", ok:"確認済" };
+const ed = (r, f, cls = "") => `<td class="ed ${cls}" contenteditable="true" spellcheck="false" data-id="${r.id}" data-f="${f}">${f.endsWith("_in") || f.endsWith("_ex") ? (r[f] ? Number(r[f]).toLocaleString("ja-JP") : "") : esc(r[f])}</td>`;
+function rowHTML(r){
+  const hasPhoto = state.photos.some(p => p.id === r.photoId);
+  return `<tr data-id="${r.id}" class="${r.confidence === "low" ? "lowrow" : ""}">
+    <td class="num">${esc(r.date)}</td><td>${esc(r.competitor)}</td><td>${esc(r.store)}</td><td>${esc(r.category)}</td>
+    ${ed(r, "maker")}${ed(r, "model", "num")}${ed(r, "spec")}
+    ${ed(r, "price_in", "r num")}${ed(r, "sale_in", "r num")}
+    <td class="r" data-cell="street">${r.street_in ? `<span class="price-tag">${yen(r.street_in)}</span>` : ""}</td>
+    ${ed(r, "sale_period")}<td class="small">${esc([r.perks, r.install, r.warranty].filter(Boolean).join(" / "))}</td>
+    ${ed(r, "note", "small")}
+    <td data-cell="conf"><span class="conf ${esc(r.confidence)}">${CONF_LABEL[r.confidence] || "中"}</span></td>
+    <td class="acts">${hasPhoto ? `<button data-photo="${r.photoId}">写真</button>` : ""}<button data-ldel="${r.id}" aria-label="削除">削除</button></td></tr>`;
+}
 function renderLedger(){
   const comps = [...new Set(state.ledger.map(r => r.competitor).filter(Boolean))];
   const cur = $("fComp").value;
   $("fComp").innerHTML = `<option value="">全競合店</option>` + comps.map(c => `<option ${c===cur?"selected":""}>${esc(c)}</option>`).join("");
-  const rows = filtered().slice().sort((a,b) => (b.date||"").localeCompare(a.date||"") || (a.category||"").localeCompare(b.category||""));
+  const rows = filtered().slice().sort((a,b) => (b.createdAt||"").localeCompare(a.createdAt||"") || (a.model||"").localeCompare(b.model||""));
   const lowN = rows.filter(r => r.confidence === "low").length;
-  $("stats").innerHTML = `<span>表示 <b>${rows.length}</b> 件</span><span>競合店 <b>${new Set(rows.map(r=>r.competitor)).size}</b></span><span>カテゴリ <b>${new Set(rows.map(r=>r.category)).size}</b></span>${lowN?`<span style="color:var(--bad)">要確認 <b>${lowN}</b> 件</span>`:""}`;
-  $("ledgerBody").innerHTML = rows.length ? rows.map(r => `<tr>
-    <td class="num">${esc(r.date)}</td><td>${esc(r.competitor)}${r.example?'<span class="ex">例</span>':""}</td><td>${esc(r.store)}</td><td>${esc(r.category)}</td>
-    <td>${esc(r.maker)}</td><td class="num">${esc(r.model)}</td><td>${esc(r.spec)}</td>
-    <td class="r num">${yen(r.price_in)}</td><td class="r num">${yen(r.sale_in)}</td>
-    <td class="r">${r.street_in?`<span class="price-tag">${yen(r.street_in)}</span>`:""}</td>
-    <td>${esc(r.sale_period)}</td><td class="small">${esc([r.perks,r.install,r.warranty].filter(Boolean).join(" / "))}</td>
-    <td><span class="conf ${esc(r.confidence)}">${({high:"高",medium:"中",low:"低"})[r.confidence]||"中"}</span></td>
-    <td><button data-ldel="${r.id}" aria-label="削除">削除</button></td></tr>`).join("")
-    : `<tr><td colspan="14" class="muted" style="text-align:center;padding:24px">まだ登録がありません。写真を読み取って「台帳に追加」すると、ここに溜まっていきます。</td></tr>`;
+  $("stats").innerHTML = `<span>表示 <b>${rows.length}</b> 件</span><span>競合店 <b>${new Set(rows.map(r=>r.competitor)).size}</b></span><span>カテゴリ <b>${new Set(rows.map(r=>r.category)).size}</b></span>${lowN?`<span style="color:var(--bad)">要確認 <b>${lowN}</b> 件</span>`:""}<span class="muted small">メーカー・型番・価格などのセルはクリックして直せます</span>`;
+  $("ledgerBody").innerHTML = rows.length ? rows.map(rowHTML).join("")
+    : `<tr><td colspan="15" class="muted" style="text-align:center;padding:24px">まだ登録がありません。写真を読み取ると、ここに自動で入ります。</td></tr>`;
+}
+// 台帳のセルを直したとき
+function editCell(td){
+  const r = state.ledger.find(x => x.id === td.dataset.id); if (!r) return;
+  const f = td.dataset.f, raw = td.textContent.trim();
+  if (f === "price_in" || f === "sale_in"){
+    const v = toNum(raw), exF = f.replace("_in", "_ex");
+    if (v === r[f]) return;
+    r[f] = v; r[exF] = null; r._calc = "";
+    r.note = String(r.note || "").split("／").filter(s => !s.includes("合いません")).join("／");
+    fillTax(r);
+    td.textContent = r[f] ? r[f].toLocaleString("ja-JP") : "";
+  } else {
+    if (raw === (r[f] || "")) return;
+    r[f] = raw;
+  }
+  if (f !== "note") r.confidence = "ok";
+  saveLedger();
+  const tr = td.closest("tr");
+  tr.classList.toggle("lowrow", r.confidence === "low");
+  tr.querySelector('[data-cell="street"]').innerHTML = r.street_in ? `<span class="price-tag">${yen(r.street_in)}</span>` : "";
+  tr.querySelector('[data-cell="conf"]').innerHTML = `<span class="conf ${esc(r.confidence)}">${CONF_LABEL[r.confidence] || "中"}</span>`;
+  const lowN = filtered().filter(x => x.confidence === "low").length;
+  const s = $("stats").querySelector('span[style]'); if (s) s.innerHTML = lowN ? `要確認 <b>${lowN}</b> 件` : "";
+}
+function zoomPhoto(id){
+  const p = state.photos.find(x => x.id === id); if (!p) return;
+  const m = document.createElement("div"); m.className = "modal"; m.innerHTML = `<img src="${p.url}" alt="">`; m.onclick = () => m.remove(); document.body.appendChild(m);
 }
 
 /* ================= 書き出し ================= */
@@ -705,29 +816,24 @@ drop.addEventListener("drop", e => addFiles([...e.dataTransfer.files]));
 document.addEventListener("paste", e => { const fs = [...(e.clipboardData?.files || [])]; if (fs.length) addFiles(fs); });
 
 $("thumbs").addEventListener("click", e => { const id = e.target.dataset.rm; if (!id) return;
-  const p = state.photos.find(x => x.id === id); if (p) URL.revokeObjectURL(p.url);
-  state.photos = state.photos.filter(x => x.id !== id); renderThumbs(); renderResults(); updateRun(); });
+  state.photos = state.photos.filter(x => x.id !== id); renderThumbs(); renderResults(); renderLedger(); updateRun(); });
 $("runBtn").addEventListener("click", runAll);
 
-$("results").addEventListener("input", e => {
-  const k = e.target.dataset.k, tr = e.target.closest("tr"); if (!k || !tr) return;
-  const p = state.photos.find(x => x.id === tr.dataset.pid); const it = p && p.items.find(x => x._id === tr.dataset.iid); if (!it) return;
-  it[k] = e.target.type === "checkbox" ? e.target.checked : e.target.value;
-  if (it._calc && it._calc.includes(k)) it._calc = it._calc.replace(k + " ", "");
-});
 $("results").addEventListener("click", e => {
   const t = e.target;
   if (t.dataset.stop){ ctl && ctl.abort(); }
-  if (t.dataset.retry){ const p = state.photos.find(x => x.id === t.dataset.retry); if (p){ p.status = "待機"; renderResults(); runAll(); } }
-  if (t.dataset.commit) commit(t.dataset.commit);
-  if (t.dataset.del){ const [pid, iid] = t.dataset.del.split(":"); const p = state.photos.find(x => x.id === pid); if (p){ p.items = p.items.filter(i => i._id !== iid); renderResults(); } }
-  if (t.dataset.addRow){ const p = state.photos.find(x => x.id === t.dataset.addRow); if (p){ p.items.push({ _id: uid(), _keep: true, category: p.ctx.category || "", confidence: "medium" }); renderResults(); } }
-  if (t.dataset.zoom){ const p = state.photos.find(x => x.id === t.dataset.zoom); if (p){ const m = document.createElement("div"); m.className = "modal"; m.innerHTML = `<img src="${p.url}" alt="">`; m.onclick = () => m.remove(); document.body.appendChild(m); } }
+  if (t.dataset.retry && !state.busy) runAll();
+  if (t.dataset.zoom) zoomPhoto(t.dataset.zoom);
 });
 
 ["fCat","fComp","fText"].forEach(id => $(id).addEventListener("input", renderLedger));
-$("ledgerBody").addEventListener("click", e => { const id = e.target.dataset.ldel; if (!id) return;
-  state.ledger = state.ledger.filter(r => r.id !== id); saveLedger(); renderLedger(); });
+$("ledgerBody").addEventListener("click", e => {
+  const t = e.target;
+  if (t.dataset.photo) zoomPhoto(t.dataset.photo);
+  if (t.dataset.ldel){ state.ledger = state.ledger.filter(r => r.id !== t.dataset.ldel); saveLedger(); renderLedger(); }
+});
+$("ledgerBody").addEventListener("focusout", e => { if (e.target.dataset && e.target.dataset.f) editCell(e.target); });
+$("ledgerBody").addEventListener("keydown", e => { if (e.key === "Enter" && e.target.dataset && e.target.dataset.f){ e.preventDefault(); e.target.blur(); } });
 $("xlsxBtn").addEventListener("click", exportXlsx);
 $("csvBtn").addEventListener("click", () => { const rows = filtered().filter(r => !r.example);
   if (!rows.length){ toast("書き出す行がありません"); return; }
