@@ -94,7 +94,7 @@ td.ed:focus{outline:2px solid var(--accent);outline-offset:-2px;background:var(-
 td.acts{display:flex;gap:6px}
 .bar{height:6px;border-radius:3px;background:var(--soft);overflow:hidden;margin-block:6px}
 .bar i{display:block;height:100%;background:var(--accent);transition:width .3s}
-.warnline{color:var(--warn);margin-top:4px}
+.tipline{color:var(--muted);margin-top:4px}
 .pb-head .t div{white-space:normal}
 tr.lowrow td{background:color-mix(in srgb,var(--bad) 7%,transparent)}
 .pb-foot{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 12px;flex-wrap:wrap}
@@ -315,12 +315,12 @@ function cropFit(img, sx, sy, sw, sh, opt = {}){
   return new Promise(r => c.toBlob(b => r(b), "image/jpeg", 0.92));
 }
 // 写真をn×nの区画に分ける（隣と35%重ねて、札が区画の境目で切れても別の区画で読めるようにする）
-async function gridCrops(img, n){
+async function gridCrops(img, n, opt = {}){
   const W = img.naturalWidth, H = img.naturalHeight, ov = 0.35;
   const tw = W / (n - (n - 1) * ov), th = H / (n - (n - 1) * ov), out = [];
   for (let y = 0; y < n; y++) for (let x = 0; x < n; x++){
     const fx = n === 1 ? 0 : x / (n - 1), fy = n === 1 ? 0 : y / (n - 1);
-    out.push(await cropFit(img, (W - tw) * fx, (H - th) * fy, tw, th));
+    out.push(await cropFit(img, (W - tw) * fx, (H - th) * fy, tw, th, opt));
   }
   return out;
 }
@@ -413,7 +413,9 @@ const FATAL = ["cancelled","not_granted","no_key","http_401","sampling_disabled"
 // ④すべての画像を読み、同じ札を何度も読んだ結果を多数決でまとめる
 async function extract(photo, ctx, signal){
   const img = photo.img, W = img.naturalWidth, H = img.naturalHeight;
-  const n = Number($("density").value) || 4;
+  // 小さめの写真は区画を1段細かくし、拡大の上限も上げる
+  const n = Math.min(6, (Number($("density").value) || 4) + (photo.low ? 1 : 0));
+  const zoom = { maxUp: photo.low ? 6 : 4 };
   const jobs = [];   // {mode, blob}
 
   setPhase(photo, "札の位置を探しています", 0);
@@ -426,12 +428,12 @@ async function extract(photo, ctx, signal){
       if (y1 < y0) [y0, y1] = [y1, y0];
       const bw = (x1 - x0) / 1000 * W, bh = (y1 - y0) / 1000 * H;
       const pad = Math.max(bw, bh) * 0.15 + Math.min(W, H) * 0.015;   // 位置のずれを見込んだ余白
-      jobs.push({ mode: "tags", blob: await cropFit(img, x0 / 1000 * W - pad, y0 / 1000 * H - pad, bw + pad * 2, bh + pad * 2) });
+      jobs.push({ mode: "tags", blob: await cropFit(img, x0 / 1000 * W - pad, y0 / 1000 * H - pad, bw + pad * 2, bh + pad * 2, zoom) });
     }
   } catch(e){ if (e && FATAL.includes(e.code)) throw e; }
 
   setPhase(photo, `写真を${n}×${n}区画に分けて拡大しています`, 0);
-  for (const b of await gridCrops(img, n)) jobs.push({ mode: "grid", blob: b });
+  for (const b of await gridCrops(img, n, zoom)) jobs.push({ mode: "grid", blob: b });
 
   // 同じ種類の画像ごとにまとめて送る（2件ずつ並行）
   const per = Math.max(1, Math.min(state.engine.maxCount, 8));
@@ -610,7 +612,7 @@ function renderResults(){
   if (!state.photos.length){ box.innerHTML = `<div class="empty">写真を入れて「写真を読み取って台帳に追加」を押すと、<br>読み取った商品が自動で下の調査台帳に入ります。</div>`; return; }
   box.innerHTML = state.photos.map(p => {
     let body = "";
-    if (p.status === "待機") body = `<span class="muted">読み取り待ち</span>${p.low ? `<div class="warnline">この写真は画質が低めです（長辺${Math.max(p.img.naturalWidth, p.img.naturalHeight)}px）。型番を読み違えやすいので、カメラの元の写真があればそちらを使ってください。</div>` : ""}`;
+    if (p.status === "待機") body = `<span class="muted">読み取り待ち</span>${p.low && !hideLowTip() ? `<div class="tipline">小さめの写真なので、拡大と補正を強めにかけて読み取ります。<button class="link" data-hidetip="1">次から表示しない</button></div>` : ""}`;
     else if (p.status === "読み取り中") body = `<div><span class="spinner"></span> ${esc(p.phase || "準備しています")}</div>
       <div class="bar"><i style="width:${Math.round((p.progress || 0) * 100)}%"></i></div>
       <div class="small muted">1枚あたり2〜5分ほどかかります。 <button class="link" data-stop="1">中止</button></div>`;
@@ -689,6 +691,7 @@ function editCell(td){
   const lowN = filtered().filter(x => x.confidence === "low").length;
   const s = $("stats").querySelector('span[style]'); if (s) s.innerHTML = lowN ? `要確認 <b>${lowN}</b> 件` : "";
 }
+function hideLowTip(){ return load("cps-hide-lowtip") === "1"; }
 function zoomPhoto(id){
   const p = state.photos.find(x => x.id === id); if (!p) return;
   const m = document.createElement("div"); m.className = "modal"; m.innerHTML = `<img src="${p.url}" alt="">`; m.onclick = () => m.remove(); document.body.appendChild(m);
@@ -824,6 +827,7 @@ $("results").addEventListener("click", e => {
   if (t.dataset.stop){ ctl && ctl.abort(); }
   if (t.dataset.retry && !state.busy) runAll();
   if (t.dataset.zoom) zoomPhoto(t.dataset.zoom);
+  if (t.dataset.hidetip){ store("cps-hide-lowtip", "1"); renderResults(); }
 });
 
 ["fCat","fComp","fText"].forEach(id => $(id).addEventListener("input", renderLedger));
