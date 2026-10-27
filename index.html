@@ -3,140 +3,294 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>競合価格調査シート</title>
+<title>競合価格調査</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=Zen+Kaku+Gothic+New:wght@700;900&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<!-- Apple製品では本体の書体（San Francisco＋ヒラギノ）、それ以外ではNoto Sans JPで表示 -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap">
 <style>
 :root{
-  --paper:#f6f7f9; --card:#ffffff; --ink:#18202e; --muted:#5b6575; --line:#d9dee6;
-  --accent:#1d3f9e; --accent-ink:#ffffff; --tag:#ffd83a; --tag-ink:#1b1b1b;
-  --good:#1f7a4d; --warn:#a86500; --bad:#b3261e; --soft:#eef1f6;
-  --f-display:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",sans-serif;
-  --f-body:"BIZ UDPGothic","Hiragino Sans","Yu Gothic","Meiryo",sans-serif;
-  --f-num:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+  --bg:#f5f5f7; --card:#ffffff; --ink:#1d1d1f; --ink2:#6e6e73; --ink3:#86868b;
+  --line:rgba(0,0,0,.08); --fill:rgba(0,0,0,.045); --fill2:rgba(0,0,0,.07);
+  --accent:#0071e3; --accent-h:#0077ed; --accent-soft:rgba(0,113,227,.1);
+  --good:#248a3d; --warn:#b25000; --bad:#d70015; --bad-soft:rgba(215,0,21,.06);
+  --glass:rgba(251,251,253,.72); --shadow:0 2px 6px rgba(0,0,0,.04),0 12px 32px rgba(0,0,0,.06);
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro JP","Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic UI",Meiryo,sans-serif;
+  --display:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro JP","Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic UI",Meiryo,sans-serif;
+  --ease:cubic-bezier(.25,.1,.25,1); --spring:cubic-bezier(.34,1.36,.64,1);
+  color-scheme:light;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --paper:#12161d; --card:#1a2029; --ink:#e7ebf2; --muted:#9aa4b4; --line:#2f3743;
-  --accent:#7d9cff; --accent-ink:#0d1220; --tag:#e8c22a; --tag-ink:#141414;
-  --good:#5fc993; --warn:#e3a646; --bad:#ff8a80; --soft:#222a35; color-scheme:dark}}
+  --bg:#000000; --card:#1c1c1e; --ink:#f5f5f7; --ink2:#a1a1a6; --ink3:#8e8e93;
+  --line:rgba(255,255,255,.1); --fill:rgba(255,255,255,.07); --fill2:rgba(255,255,255,.11);
+  --accent:#2997ff; --accent-h:#3ea1ff; --accent-soft:rgba(41,151,255,.16);
+  --good:#30d158; --warn:#ff9f0a; --bad:#ff453a; --bad-soft:rgba(255,69,58,.1);
+  --glass:rgba(22,22,23,.72); --shadow:0 0 0 1px rgba(255,255,255,.06),0 12px 32px rgba(0,0,0,.5); color-scheme:dark}}
 :root[data-theme="dark"]{
-  --paper:#12161d; --card:#1a2029; --ink:#e7ebf2; --muted:#9aa4b4; --line:#2f3743;
-  --accent:#7d9cff; --accent-ink:#0d1220; --tag:#e8c22a; --tag-ink:#141414;
-  --good:#5fc993; --warn:#e3a646; --bad:#ff8a80; --soft:#222a35; color-scheme:dark}
+  --bg:#000000; --card:#1c1c1e; --ink:#f5f5f7; --ink2:#a1a1a6; --ink3:#8e8e93;
+  --line:rgba(255,255,255,.1); --fill:rgba(255,255,255,.07); --fill2:rgba(255,255,255,.11);
+  --accent:#2997ff; --accent-h:#3ea1ff; --accent-soft:rgba(41,151,255,.16);
+  --good:#30d158; --warn:#ff9f0a; --bad:#ff453a; --bad-soft:rgba(255,69,58,.1);
+  --glass:rgba(22,22,23,.72); --shadow:0 0 0 1px rgba(255,255,255,.06),0 12px 32px rgba(0,0,0,.5); color-scheme:dark}
 
 *{box-sizing:border-box}
 [hidden]{display:none!important}
-body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.6;
-  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.55;letter-spacing:.01em;
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;font-feature-settings:"palt" 1}
 img{max-width:100%}
-.wrap{max-width:1280px;margin:0 auto;display:grid;gap:20px}
-h1,h2,h3{font-family:var(--f-display);margin:0;text-wrap:balance;line-height:1.3}
-h1{font-size:1.6rem;font-weight:900;letter-spacing:.02em}
-h2{font-size:1.1rem;font-weight:700}
-.num{font-family:var(--f-num);font-variant-numeric:tabular-nums}
-.muted{color:var(--muted)}
-.small{font-size:12px}
-header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
-.top .sub{color:var(--muted);margin-top:4px}
-.engine{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border:1px solid var(--line);border-radius:999px;background:var(--card);font-size:12px}
-.dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
-.dot.ok{background:var(--good)} .dot.warn{background:var(--warn)} .dot.bad{background:var(--bad)}
+h1,h2,h3{font-family:var(--display);margin:0;font-weight:700;letter-spacing:-.015em;text-wrap:balance}
+.num,td.r,.stats b{font-variant-numeric:tabular-nums}
+.muted{color:var(--ink2)}
+.small{font-size:13px}
+b{font-weight:600}
 
-.grid2{display:grid;grid-template-columns:minmax(0,360px) minmax(0,1fr);gap:20px;align-items:start}
-@media (max-width:900px){.grid2{grid-template-columns:minmax(0,1fr)}}
-.panel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;display:grid;gap:14px;min-width:0}
-.panel-head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
-label.f{display:grid;gap:4px;font-size:12px;color:var(--muted)}
-input,select,textarea{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:6px;padding:7px 9px;min-width:0;width:100%}
-input:focus-visible,select:focus-visible,button:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
-.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.drop{border:2px dashed var(--line);border-radius:10px;padding:18px;text-align:center;cursor:pointer;background:var(--soft);display:grid;gap:6px;justify-items:center}
-.drop.over{border-color:var(--accent)}
-.drop strong{font-family:var(--f-display)}
-.thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:8px}
-.thumb{position:relative;aspect-ratio:3/4;border-radius:6px;overflow:hidden;border:1px solid var(--line);max-width:100%}
+/* ---------- 上部の半透明バー ---------- */
+.nav{position:sticky;top:0;z-index:30;background:var(--glass);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);
+  border-bottom:1px solid var(--line);padding-top:env(safe-area-inset-top,0px)}
+.nav-in{max-width:1180px;margin:0 auto;height:52px;display:flex;align-items:center;gap:12px;
+  padding-left:max(22px,env(safe-area-inset-left,0px));padding-right:max(22px,env(safe-area-inset-right,0px))}
+.nav-title{font-family:var(--display);font-weight:600;font-size:17px;letter-spacing:-.01em;margin-right:auto;white-space:nowrap}
+.engine{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--ink2);min-width:0}
+.engine span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dot{flex:none;width:7px;height:7px;border-radius:50%;background:var(--ink3);transition:background .4s var(--ease),box-shadow .4s var(--ease)}
+.dot.ok{background:var(--good);box-shadow:0 0 0 3px color-mix(in srgb,var(--good) 18%,transparent)}
+.dot.warn{background:var(--warn);animation:breathe 1.6s var(--ease) infinite}
+.dot.bad{background:var(--bad)}
+@keyframes breathe{50%{opacity:.35}}
+@media (max-width:640px){.engine span:last-child{display:none}}
+
+/* ---------- 全体 ---------- */
+.wrap{max-width:1180px;margin:0 auto;display:grid;gap:28px;
+  padding:0 max(22px,env(safe-area-inset-right,0px)) 96px max(22px,env(safe-area-inset-left,0px))}
+
+/* ---------- 冒頭 ---------- */
+.hero{text-align:center;padding:72px 0 8px;display:grid;justify-items:center;gap:14px}
+.hero h1{font-size:clamp(34px,6vw,64px);line-height:1.08;letter-spacing:-.03em;font-weight:700}
+.hero p{margin:0;max-width:34em;font-size:clamp(16px,1.6vw,20px);line-height:1.5;color:var(--ink2);font-weight:500}
+.drop{width:100%;max-width:980px;margin-top:28px;position:relative;border-radius:28px;background:var(--card);box-shadow:var(--shadow);
+  padding:44px 24px 36px;display:grid;justify-items:center;gap:10px;cursor:pointer;
+  transition:transform .5s var(--spring),box-shadow .4s var(--ease)}
+.drop::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:2px;pointer-events:none;opacity:0;transition:opacity .35s var(--ease);
+  background:conic-gradient(from var(--ang,0deg),#0071e3,#7a5cff,#ff3b6b,#ff9f0a,#34c759,#0071e3);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
+.drop:hover{transform:translateY(-2px)}
+.drop.over{transform:scale(1.015)}
+.drop.over::before{opacity:1;animation:spinring 2.4s linear infinite}
+@property --ang{syntax:"<angle>";inherits:false;initial-value:0deg}
+@keyframes spinring{to{--ang:360deg}}
+.drop-icon{width:56px;height:56px;border-radius:16px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);transition:transform .5s var(--spring)}
+.drop:hover .drop-icon,.drop.over .drop-icon{transform:translateY(-3px) scale(1.06)}
+.drop strong{font-family:var(--display);font-size:21px;font-weight:600;letter-spacing:-.01em}
+.drop .hint{font-size:14px;color:var(--ink2)}
+.drop .link-like{color:var(--accent)}
+.thumbs{width:100%;display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:10px;margin-top:14px}
+.thumbs:empty{display:none}
+.thumb{position:relative;aspect-ratio:1;border-radius:14px;overflow:hidden;background:var(--fill);animation:pop .5s var(--spring) both}
 .thumb img{width:100%;height:100%;object-fit:cover;display:block}
-.thumb .st{position:absolute;inset:auto 0 0 0;font-size:11px;padding:2px 4px;background:rgba(0,0,0,.6);color:#fff}
-.thumb button{position:absolute;top:2px;right:2px;width:22px;height:22px;padding:0;border-radius:50%;line-height:1;font-size:13px}
-button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:6px;padding:7px 12px}
-button:hover{border-color:var(--accent)}
-button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700}
-button.tagbtn{background:var(--tag);color:var(--tag-ink);border-color:var(--tag);font-weight:700}
-button:disabled{opacity:.5;cursor:not-allowed}
-button.link{border:none;background:none;color:var(--accent);padding:0;text-decoration:underline}
-.note{font-size:12px;color:var(--muted);background:var(--soft);border-radius:6px;padding:8px 10px}
+.thumb .st{position:absolute;left:6px;bottom:6px;font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;color:#fff;
+  background:rgba(0,0,0,.45);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.thumb button{position:absolute;top:6px;right:6px;width:24px;height:24px;padding:0;border-radius:50%;border:0;font-size:14px;line-height:24px;color:#fff;
+  background:rgba(0,0,0,.45);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+@keyframes pop{from{opacity:0;transform:scale(.85)}}
 
-.results{display:grid;gap:16px}
-.empty{color:var(--muted);text-align:center;padding:36px 12px;border:1px dashed var(--line);border-radius:10px}
-.photo-block{border:1px solid var(--line);border-radius:10px;overflow:hidden}
-.pb-head{display:flex;gap:12px;align-items:center;padding:10px 12px;background:var(--soft);flex-wrap:wrap}
-.pb-head img{width:56px;height:56px;object-fit:cover;border-radius:6px;cursor:zoom-in}
-.pb-head .t{flex:1;min-width:0}
+/* ---------- カード ---------- */
+.grid2{display:grid;grid-template-columns:minmax(0,400px) minmax(0,1fr);gap:22px;align-items:start}
+@media (max-width:920px){.grid2{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--card);border-radius:22px;padding:28px;display:grid;gap:18px;min-width:0;box-shadow:var(--shadow)}
+.panel h2{font-size:24px;line-height:1.2}
+.panel-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px 16px;flex-wrap:wrap}
+.panel-sub{font-size:14px;color:var(--ink2)}
+
+/* ---------- 入力 ---------- */
+label.f{display:grid;gap:6px;font-size:13px;color:var(--ink2);font-weight:500}
+input,select,textarea{font:inherit;font-size:15px;color:var(--ink);background:var(--fill);border:1px solid transparent;border-radius:12px;padding:10px 12px;min-width:0;width:100%;
+  transition:background .2s var(--ease),border-color .2s var(--ease),box-shadow .2s var(--ease);-webkit-appearance:none;appearance:none}
+select{background-image:linear-gradient(45deg,transparent 50%,var(--ink2) 50%),linear-gradient(135deg,var(--ink2) 50%,transparent 50%);
+  background-position:calc(100% - 17px) 52%,calc(100% - 12px) 52%;background-size:5px 5px;background-repeat:no-repeat;padding-right:32px}
+input:hover,select:hover{background-color:var(--fill2)}
+input:focus,select:focus,textarea:focus{outline:none;background-color:var(--card);border-color:var(--accent);box-shadow:0 0 0 4px var(--accent-soft)}
+button:focus-visible,.drop:focus-visible,.seg button:focus-visible{outline:none;box-shadow:0 0 0 4px var(--accent-soft),0 0 0 1px var(--accent)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:420px){.row2{grid-template-columns:1fr}}
+
+/* セグメントコントロール（読み取りの細かさ） */
+.seg-wrap{display:grid;gap:8px}
+.seg-label{font-size:13px;color:var(--ink2);font-weight:500}
+.seg{position:relative;display:grid;grid-template-columns:repeat(3,1fr);background:var(--fill);border-radius:12px;padding:3px}
+.seg .thumb-bg{position:absolute;top:3px;bottom:3px;left:3px;width:calc((100% - 6px)/3);border-radius:9px;background:var(--card);
+  box-shadow:0 1px 2px rgba(0,0,0,.08),0 3px 10px rgba(0,0,0,.06);transition:transform .45s var(--spring)}
+.seg button{position:relative;z-index:1;border:0;background:none;padding:8px 6px;font-size:14px;font-weight:600;color:var(--ink2);border-radius:9px;transition:color .25s var(--ease)}
+.seg button[aria-checked="true"]{color:var(--ink)}
+.seg-desc{font-size:13px;color:var(--ink2);min-height:2.6em;transition:opacity .25s var(--ease)}
+
+/* ---------- ボタン ---------- */
+button{font:inherit;font-size:14px;font-weight:500;cursor:pointer;border:0;background:var(--fill);color:var(--ink);border-radius:980px;padding:8px 16px;
+  transition:background .2s var(--ease),transform .25s var(--spring),opacity .2s var(--ease),color .2s var(--ease);-webkit-tap-highlight-color:transparent}
+button:hover{background:var(--fill2)}
+button:active:not(:disabled){transform:scale(.96)}
+button.primary{background:var(--accent);color:#fff;font-size:17px;font-weight:500;padding:13px 22px}
+button.primary:hover{background:var(--accent-h)}
+button.tagbtn{background:var(--accent);color:#fff}
+button.tagbtn:hover{background:var(--accent-h)}
+button.danger{color:var(--bad);background:none}
+button.danger:hover{background:var(--bad-soft)}
+button.danger.solid{background:var(--bad);color:#fff}
+button.danger.solid:hover{background:color-mix(in srgb,var(--bad) 88%,#000)}
+button:disabled{opacity:.38;cursor:not-allowed}
+button.link{background:none;color:var(--accent);padding:0;border-radius:4px;font-weight:500}
+button.link:hover{text-decoration:underline;background:none}
+.note{font-size:13px;color:var(--ink2);line-height:1.6}
+.note b{color:var(--ink)}
+
+/* ---------- 読み取り状況 ---------- */
+.results{display:grid;gap:12px}
+.empty{color:var(--ink2);text-align:center;padding:48px 16px;border-radius:16px;background:var(--fill);font-size:14px;line-height:1.7}
+.photo-block{border-radius:16px;background:var(--fill);overflow:hidden;animation:rise .55s var(--spring) both}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}}
+.pb-head{display:flex;gap:14px;align-items:flex-start;padding:14px}
+.pb-head img{width:64px;height:64px;object-fit:cover;border-radius:12px;cursor:zoom-in;flex:none;transition:transform .35s var(--spring)}
+.pb-head img:hover{transform:scale(1.05)}
+.pb-head .t{flex:1;min-width:0;display:grid;gap:4px}
 .pb-head .t > div{overflow-wrap:anywhere}
 .pb-acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
-.bar{height:6px;border-radius:3px;background:var(--card);overflow:hidden;margin-block:6px}
-.bar i{display:block;height:100%;background:var(--accent);transition:width .3s}
-.spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite;vertical-align:-2px}
+.pb-acts button{background:var(--card);font-size:13px;padding:6px 14px}
+.pb-acts button:hover{background:var(--card);color:var(--accent)}
+.bar{height:4px;border-radius:2px;background:var(--fill2);overflow:hidden;margin:8px 0 6px;position:relative}
+.bar i{display:block;height:100%;border-radius:2px;background:var(--accent);transition:width .6s var(--ease);position:relative;overflow:hidden}
+.bar i::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.6),transparent);transform:translateX(-100%);animation:shine 1.4s var(--ease) infinite}
+@keyframes shine{to{transform:translateX(100%)}}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--fill2);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;vertical-align:-2px;margin-right:4px}
+button.primary .spinner{border-color:rgba(255,255,255,.35);border-top-color:#fff}
 @keyframes spin{to{transform:rotate(360deg)}}
-@media (prefers-reduced-motion:reduce){.spinner{animation:none}}
 
-table{border-collapse:collapse;width:100%}
-th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle;white-space:nowrap}
-th{font-size:11px;color:var(--muted);font-weight:700;letter-spacing:.04em;background:var(--card);position:sticky;top:0;z-index:1}
-td.r{text-align:right}
-.conf{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;border:1px solid currentColor;font-weight:700}
-.conf.high{color:var(--good)} .conf.medium{color:var(--warn)} .conf.low{color:var(--bad)} .conf.ok{color:var(--accent)}
-td.ed{cursor:text;border-bottom:1px dashed var(--line);min-width:3em}
-td.ed:hover{background:var(--soft)}
-td.ed:focus{outline:2px solid var(--accent);outline-offset:-2px;background:var(--card)}
-td.ed:empty::before{content:"—";color:var(--line)}
-td.acts{display:flex;gap:6px}
-tr.lowrow td{background:color-mix(in srgb,var(--bad) 7%,transparent)}
+/* ---------- 台帳 ---------- */
+.ledger-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
+.tools-left,.tools-right{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.ledger-tools select,.ledger-tools input{width:auto;padding:8px 12px;font-size:14px;border-radius:980px}
+.ledger-tools select{padding-right:30px}
+.ledger-tools input[type=search]{min-width:200px}
+.stats{display:flex;gap:6px 22px;flex-wrap:wrap;font-size:13px;color:var(--ink2);align-items:baseline}
+.stats b{font-family:var(--display);font-size:22px;font-weight:600;color:var(--ink);margin:0 2px;letter-spacing:-.01em}
+.ledger-wrap{max-height:600px;overflow:auto;border-radius:16px;background:var(--card);border:1px solid var(--line)}
+table{border-collapse:separate;border-spacing:0;width:100%}
+th,td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle;white-space:nowrap;font-size:14px}
+th{font-size:12px;color:var(--ink2);font-weight:600;background:var(--glass);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);position:sticky;top:0;z-index:1;line-height:1.3}
+tbody tr{transition:background .25s var(--ease)}
+tbody tr:hover td{background:color-mix(in srgb,var(--fill) 60%,transparent)}
+tbody tr:last-child td{border-bottom:0}
+td.r,th.r{text-align:right}
+.conf{display:inline-block;font-size:12px;padding:2px 10px;border-radius:980px;font-weight:600}
+.conf.high{color:var(--good);background:color-mix(in srgb,var(--good) 12%,transparent)}
+.conf.medium{color:var(--warn);background:color-mix(in srgb,var(--warn) 12%,transparent)}
+.conf.low{color:var(--bad);background:var(--bad-soft)}
+.conf.ok{color:var(--accent);background:var(--accent-soft)}
+td.ed{cursor:text;border-radius:0;transition:background .2s var(--ease),box-shadow .2s var(--ease)}
+td.ed:hover{background:var(--fill)}
+td.ed:focus{outline:none;background:var(--card);box-shadow:inset 0 0 0 2px var(--accent)}
+td.ed:empty::before{content:"—";color:var(--ink3);opacity:.5}
+td.calc{color:var(--ink3)}
+td.calc::after{content:"計算";font-size:10px;font-weight:600;margin-left:5px;padding:1px 5px;border-radius:5px;background:var(--fill);color:var(--ink3);vertical-align:1px}
+td.calc:focus::after{content:none}
+.basis{font-size:12px;white-space:normal;min-width:10em;line-height:1.35;color:var(--ink2)}
+.basis.weak{color:var(--bad);font-weight:600}
+td.acts{display:flex;gap:4px;border-bottom-color:transparent}
+td.acts button{padding:5px 11px;font-size:12px;white-space:nowrap}
+tr.lowrow td{background:var(--bad-soft)}
+tr.fresh td{animation:fresh 2.2s var(--ease)}
+@keyframes fresh{0%{background:var(--accent-soft)}100%{background:transparent}}
+.price-tag{display:inline-block;font-weight:700;color:var(--ink);background:var(--accent-soft);padding:2px 10px;border-radius:980px;font-variant-numeric:tabular-nums}
+.oldnote{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:14px;background:color-mix(in srgb,var(--warn) 10%,var(--card));border-radius:14px;padding:12px 16px}
+.oldnote button{background:var(--card)}
+.confirm{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13px}
+.foot{font-size:12px;color:var(--ink3);text-align:center;line-height:1.7;max-width:44em;margin:0 auto}
 
-.ledger-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-.ledger-tools select,.ledger-tools input{width:auto}
-.stats{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;align-items:baseline}
-.stats b{font-family:var(--f-num);font-size:1.1rem}
-.price-tag{display:inline-block;background:var(--tag);color:var(--tag-ink);font-family:var(--f-num);font-weight:600;padding:0 6px;border-radius:3px}
-.ledger-wrap{max-height:520px;overflow:auto;border:1px solid var(--line);border-radius:8px}
-.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--paper);padding:8px 16px;border-radius:999px;font-size:13px;z-index:50;max-width:calc(100% - 32px)}
-.confirm{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px}
+/* ---------- 通知・ダイアログ ---------- */
+.toast{position:fixed;left:50%;bottom:calc(28px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:60;max-width:calc(100% - 40px);
+  background:var(--glass);color:var(--ink);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);
+  box-shadow:0 8px 30px rgba(0,0,0,.16),0 0 0 1px var(--line);padding:11px 20px;border-radius:980px;font-size:14px;font-weight:500;
+  animation:toastIn .5s var(--spring) both}
+.toast.out{animation:toastOut .35s var(--ease) both}
+@keyframes toastIn{from{opacity:0;transform:translate(-50%,16px) scale(.96)}}
+@keyframes toastOut{to{opacity:0;transform:translate(-50%,8px) scale(.98)}}
+.dlg{position:fixed;inset:0;background:rgba(0,0,0,.32);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);display:grid;place-items:center;z-index:55;padding:20px;animation:fade .3s var(--ease)}
+.dlg .box{background:var(--card);color:var(--ink);border-radius:22px;padding:28px;max-width:440px;width:100%;display:grid;gap:14px;box-shadow:0 24px 80px rgba(0,0,0,.3);animation:sheet .5s var(--spring)}
+.dlg h3{font-size:21px}
+.dlg ul{margin:0;padding-left:1.2em;font-size:14px;color:var(--ink2);line-height:1.8}
+.dlg .row{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;margin-top:4px}
+.dlg .row button{padding:10px 20px;font-size:15px}
+.dlg label{display:flex;gap:10px;align-items:center;font-size:14px}
+.dlg label input{width:18px;height:18px;padding:0;accent-color:var(--accent);-webkit-appearance:checkbox;appearance:auto}
+@keyframes fade{from{opacity:0}}
+@keyframes sheet{from{opacity:0;transform:translateY(16px) scale(.97)}}
 
 /* 写真の確認・範囲指定 */
-.viewer{position:fixed;inset:0;background:rgba(10,12,16,.97);z-index:40;display:grid;grid-template-rows:auto 1fr auto;color:#fff;
-  padding:max(10px,env(safe-area-inset-top,0px)) max(10px,env(safe-area-inset-right,0px)) max(10px,env(safe-area-inset-bottom,0px)) max(10px,env(safe-area-inset-left,0px))}
-.viewer .vh{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding-bottom:8px}
-.viewer .vh button,.viewer .vf button{background:#222a35;color:#fff;border-color:#3a4555}
-.viewer .vh button.primary,.viewer .vf button.primary{background:#ffd83a;color:#141414;border-color:#ffd83a}
+.viewer{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:50;display:grid;grid-template-rows:auto 1fr auto;color:#f5f5f7;animation:fade .3s var(--ease);
+  padding:max(12px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(12px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.viewer .vh{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding-bottom:12px}
+.viewer .vh b{font-family:var(--display);font-size:17px}
+.viewer button{background:rgba(255,255,255,.14);color:#fff}
+.viewer button:hover{background:rgba(255,255,255,.22)}
+.viewer button.primary{background:#2997ff;font-size:15px;padding:10px 20px}
 .viewer .stage{position:relative;overflow:hidden;display:grid;place-items:center;min-height:0;touch-action:none}
-.viewer canvas{max-width:100%;max-height:calc(100vh - 150px);max-height:calc(100dvh - 150px);display:block;cursor:crosshair;touch-action:none}
-.viewer .vf{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding-top:8px;font-size:13px}
-.legend i{display:inline-block;width:12px;height:12px;border:2px solid;margin:0 4px -2px 10px}
+.viewer canvas{max-width:100%;max-height:calc(100vh - 160px);max-height:calc(100dvh - 160px);display:block;cursor:crosshair;touch-action:none;border-radius:12px;animation:sheet .5s var(--spring)}
+.viewer .vf{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding-top:12px;font-size:13px}
+.legend{color:#a1a1a6}
+.legend i{display:inline-block;width:12px;height:12px;border:2px solid;border-radius:3px;margin:0 5px -2px 12px}
+.legend i:first-child{margin-left:0}
+
+/* 起動時の1回だけの登場 */
+.intro > *{animation:rise .9s var(--spring) both}
+.intro > :nth-child(2){animation-delay:.08s}
+.intro > :nth-child(3){animation-delay:.16s}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
+@media (max-width:640px){
+  .hero{padding-top:44px}
+  .panel{padding:20px;border-radius:20px}
+  .drop{padding:32px 18px 26px;border-radius:22px}
+  .ledger-tools input[type=search]{min-width:0;width:100%}
+}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header class="top">
-    <div>
-      <h1>競合価格調査シート</h1>
-      <div class="sub">他社売場の値札写真から、型番・価格・スペックを読み取って台帳にします。読み取りはこの端末の中だけで行い、APIキーや利用料は不要です。</div>
+<header class="nav">
+  <div class="nav-in">
+    <div class="nav-title">競合価格調査</div>
+    <span class="engine" id="engine" title="文字認識はこの端末の中で動きます"><span class="dot warn" id="engineDot"></span><span id="engineText">文字認識：初回の読み取り時に準備します</span></span>
+    <button id="resetBtn" class="danger">データをリセット</button>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero intro">
+    <h1>値札を撮るだけで、<br>競合の価格台帳に。</h1>
+    <p>型番・税抜と税込・スペックを写真から読み取ります。処理はすべてこの端末の中で行うので、APIキーも利用料もいりません。</p>
+    <div class="drop" id="drop" role="button" tabindex="0" aria-label="値札の写真を選ぶ">
+      <div class="drop-icon" aria-hidden="true">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.6l1.2-1.6A1 1 0 0 1 10.1 4h3.8a1 1 0 0 1 .8.4L15.9 6h1.6A2.5 2.5 0 0 1 20 8.5v8a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5z"/><circle cx="12" cy="12.5" r="3.4"/></svg>
+      </div>
+      <strong>値札の写真をドロップ</strong>
+      <span class="hint">画面のどこに落としてもOK。<span class="link-like">クリックして選ぶ</span>こともできます（JPG・PNG・HEIC、複数枚）</span>
+      <input id="file" type="file" accept="image/*,.jpg,.jpeg,.JPG,.JPEG,.jfif,.png,.heic,.heif" multiple hidden>
+      <div class="thumbs" id="thumbs"></div>
     </div>
-    <span class="engine" id="engine"><span class="dot warn" id="engineDot"></span><span id="engineText">文字認識：未読み込み（初回の読み取り時に準備します）</span></span>
-  </header>
+  </section>
 
   <div class="grid2">
     <section class="panel" aria-labelledby="h-input">
-      <h2 id="h-input">1. 調査情報と写真</h2>
+      <h2 id="h-input">調査情報</h2>
       <div class="row2">
         <label class="f">競合店
-          <input id="competitor" list="competitorList" placeholder="例：ケーズデンキ">
+          <input id="competitor" list="competitorList" placeholder="ケーズデンキ" autocomplete="off">
           <datalist id="competitorList">
             <option value="ケーズデンキ"><option value="ヤマダデンキ"><option value="ビックカメラ"><option value="ヨドバシカメラ"><option value="エディオン"><option value="ジョーシン"><option value="コジマ"><option value="ベスト電器"><option value="100満ボルト">
           </datalist>
         </label>
         <label class="f">店舗名
-          <input id="store" placeholder="例：成田店">
+          <input id="store" placeholder="成田店" autocomplete="off">
         </label>
       </div>
       <div class="row2">
@@ -148,29 +302,30 @@ tr.lowrow td{background:color-mix(in srgb,var(--bad) 7%,transparent)}
         </label>
       </div>
 
-      <div class="drop" id="drop" role="button" tabindex="0" aria-label="写真を選択">
-        <strong>値札の写真をここ（画面のどこでも可）にドロップ</strong>
-        <span class="small muted">またはタップして選択（複数枚OK・JPG / JPEG / PNG / HEIC）</span>
-        <input id="file" type="file" accept="image/*,.jpg,.jpeg,.JPG,.JPEG,.jfif,.png,.heic,.heif" multiple hidden>
-      </div>
-      <div class="thumbs" id="thumbs"></div>
-
-      <label class="f">読み取りの細かさ（細かいほど取りこぼしが減り、時間がかかります）
-        <select id="density">
-          <option value="1">速い（見つけた値札だけ読む）</option>
-          <option value="2" selected>標準（値札＋写真全体＋読めなかった所を拡大して再読）</option>
-          <option value="3">最高精度（すべての札を3通りに読み、さらに細かく再読・時間2〜3倍）</option>
+      <div class="seg-wrap">
+        <span class="seg-label" id="segLabel">読み取りの細かさ</span>
+        <div class="seg" id="seg" role="radiogroup" aria-labelledby="segLabel">
+          <span class="thumb-bg" aria-hidden="true"></span>
+          <button type="button" role="radio" data-v="1">速い</button>
+          <button type="button" role="radio" data-v="2">標準</button>
+          <button type="button" role="radio" data-v="3">最高精度</button>
+        </div>
+        <div class="seg-desc" id="segDesc"></div>
+        <select id="density" hidden>
+          <option value="1">速い</option>
+          <option value="2" selected>標準</option>
+          <option value="3">最高精度</option>
         </select>
-      </label>
+      </div>
 
       <button class="primary" id="runBtn" disabled>写真を読み取って台帳に追加</button>
-      <div class="note">撮影のコツ：遠目でも読めますが、<b>値札の横幅が写真の横幅の1/12以上</b>（売場の棚1列ぶん程度）だと確実です。<b>LINEで送った写真は画質が落ちます。</b>カメラの元の写真を使うか「オリジナル画質」で送ってください。<br>自動で読めなかった札は、写真を開いて<b>札を指で囲む</b>とその部分だけ読み直せます。</div>
+      <div class="note">遠目の写真でも読めます。確実なのは、<b>値札の横幅が写真の1/12以上</b>写っているとき（棚1列ぶん程度）。LINEで送った写真は画質が落ちるので、元の写真か「オリジナル画質」を使ってください。</div>
     </section>
 
     <section class="panel" aria-labelledby="h-review">
       <div class="panel-head">
-        <h2 id="h-review">2. 読み取り状況</h2>
-        <span class="small muted">読み取った商品は自動で調査台帳に入ります。</span>
+        <h2 id="h-review">読み取り状況</h2>
+        <span class="panel-sub">読めなかった札は、写真を開いて囲めば読み直せます。</span>
       </div>
       <div class="results" id="results"></div>
     </section>
@@ -178,25 +333,30 @@ tr.lowrow td{background:color-mix(in srgb,var(--bad) 7%,transparent)}
 
   <section class="panel" aria-labelledby="h-ledger">
     <div class="panel-head">
-      <h2 id="h-ledger">3. 調査台帳</h2>
-      <div class="ledger-tools">
-        <select id="fCat" aria-label="カテゴリで絞り込み"><option value="">全カテゴリ</option></select>
-        <select id="fComp" aria-label="競合店で絞り込み"><option value="">全競合店</option></select>
-        <input id="fText" type="search" placeholder="型番・メーカーで検索" aria-label="検索">
-        <button id="addRowBtn">＋ 手入力で行を追加</button>
-        <button class="tagbtn" id="xlsxBtn">Excelで書き出し</button>
+      <h2 id="h-ledger">調査台帳</h2>
+      <div class="stats" id="stats"></div>
+    </div>
+    <div class="ledger-tools">
+      <div class="tools-left">
+        <select id="fCat" aria-label="カテゴリで絞り込み"><option value="">すべてのカテゴリ</option></select>
+        <select id="fComp" aria-label="競合店で絞り込み"><option value="">すべての競合店</option></select>
+        <input id="fText" type="search" placeholder="型番・メーカーで検索" aria-label="型番・メーカーで検索" autocomplete="off">
+      </div>
+      <div class="tools-right">
+        <button id="addRowBtn">手入力で行を追加</button>
         <button id="csvBtn">CSV</button>
-        <button id="jsonBtn">バックアップ(JSON)</button>
-        <button id="importBtn">読み込み</button>
+        <button id="jsonBtn">バックアップ</button>
+        <button id="importBtn">バックアップを読み込む</button>
+        <button class="tagbtn" id="xlsxBtn">Excelで書き出し</button>
         <input type="file" id="importFile" accept=".json,application/json" hidden>
       </div>
     </div>
-    <div class="stats" id="stats"></div>
+    <div class="oldnote" id="oldNote" hidden></div>
     <div class="ledger-wrap">
       <table id="ledger">
         <thead><tr>
           <th>調査日</th><th>競合店</th><th>店舗</th><th>カテゴリ</th><th>メーカー</th><th>型番</th><th>主要スペック</th>
-          <th class="r">表示価格(税込)</th><th class="r">特価(税込)</th><th class="r">実売(税込)</th><th>特価期間</th><th>保証</th><th>工事・特典</th><th>備考</th><th>信頼度</th><th></th>
+          <th class="r">表示価格<br>税抜</th><th class="r">表示価格<br>税込</th><th class="r">特価<br>税抜</th><th class="r">特価<br>税込</th><th class="r">実売<br>税込</th><th>税込・税抜の根拠</th><th>特価期間</th><th>保証</th><th>工事・特典</th><th>備考</th><th>信頼度</th><th></th>
         </tr></thead>
         <tbody id="ledgerBody"></tbody>
       </table>
@@ -205,16 +365,28 @@ tr.lowrow td{background:color-mix(in srgb,var(--bad) 7%,transparent)}
       <button class="link" id="clearBtn">台帳をすべて削除</button>
     </div>
   </section>
+
+  <p class="foot">写真と台帳は外部に送られず、ページを開いている間だけこの端末の中に置かれます。ページを閉じたり再読み込みすると消えるので、残したい台帳は「Excelで書き出し」か「バックアップ」で保存してください。灰色で「計算」と付いた金額は、札に書かれておらず、もう一方の金額から消費税10%で計算した値です。</p>
+</main>
+
+<div class="dlg" id="resetDlg" hidden role="dialog" aria-modal="true" aria-labelledby="resetTitle">
+  <div class="box">
+    <h3 id="resetTitle">データをリセットしますか？</h3>
+    <div class="small muted">次のデータをこの端末から削除して、最初の状態に戻します。元に戻せないので、必要なら先に「Excelで書き出し」か「バックアップ」で保存してください。</div>
+    <ul id="resetList"></ul>
+    <label><input type="checkbox" id="resetKeepShop"> 競合店名・店舗名の入力は残す</label>
+    <div class="row"><button id="resetNo">キャンセル</button><button id="resetYes" class="danger solid">リセット</button></div>
+  </div>
 </div>
 
 <div class="viewer" id="viewer" hidden role="dialog" aria-modal="true" aria-labelledby="vTitle">
   <div class="vh">
-    <div><b id="vTitle">写真の確認</b><div class="small" style="opacity:.8">読めていない札を指（マウス）でドラッグして囲むと、その部分を読み取って台帳に追加します。</div></div>
+    <div><b id="vTitle">写真の確認</b><div class="small" style="color:#a1a1a6">読めていない札を指かマウスで囲むと、その部分を読み取って台帳に追加します。</div></div>
     <button id="vClose">閉じる</button>
   </div>
   <div class="stage" id="vStage"><canvas id="vCanvas"></canvas></div>
   <div class="vf">
-    <span class="legend"><i style="border-color:#3ddc84"></i>読めた札<i style="border-color:#ff6b6b"></i>札らしいが読めなかった所</span>
+    <span class="legend"><i style="border-color:#30d158"></i>読めた札<i style="border-color:#ff453a"></i>札らしいが読めなかった所</span>
     <span id="vMsg" style="margin-left:auto"></span>
     <button class="primary" id="vRead" disabled>囲んだ範囲を読み取る</button>
   </div>
@@ -234,7 +406,10 @@ const TESS_SOURCES = [
 ];
 // 日本語・英語の文字データ（未指定＝jsDelivr の既定の置き場所）
 const LANG_PATHS = [null, "https://tessdata.projectnaptha.com/4.0.0"];
-const STORE_KEY = "competitor-price-survey-v1";
+const STORE_KEY = "competitor-price-survey-v2";
+const OLD_KEYS = ["competitor-price-survey-v1"];   // 以前の版が保存していた台帳（自動では読み込まない）
+const ALL_KEYS = () => [STORE_KEY, ...OLD_KEYS, STYLE_KEY, "cps-competitor", "cps-store", "cps-hide-lowtip", "cps-density", "competitor-price-survey-apikey"];
+const STYLE_KEY = "competitor-price-survey-taxstyle";   // 競合店ごとの「大きく書かれた金額が税抜か税込か」
 
 /* ================= 状態 ================= */
 const state = { photos: [], ledger: [], downloads: null, busy: false };
@@ -242,7 +417,11 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const yen = (n) => (n == null || n === "" || isNaN(n)) ? "" : "¥" + Number(n).toLocaleString("ja-JP");
 const uid = () => Math.random().toString(36).slice(2, 10);
-function toast(msg){ const t=document.createElement("div"); t.className="toast"; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),2800); }
+function toast(msg){
+  document.querySelectorAll(".toast").forEach(o => o.remove());
+  const t = document.createElement("div"); t.className = "toast"; t.setAttribute("role", "status"); t.textContent = msg; document.body.appendChild(t);
+  setTimeout(() => { t.classList.add("out"); setTimeout(() => t.remove(), 400); }, 2600);
+}
 function store(k,v){ try{ localStorage.setItem(k, typeof v==="string"?v:JSON.stringify(v)); }catch(e){} }
 function load(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
 
@@ -255,13 +434,38 @@ function toNum(v){
   const n = Math.round(parseFloat(s.replace(/\.(?=\d{3}(\D|$))/g, "")));
   return isFinite(n) ? n : null;
 }
-const taxOK = (ex, inc) => !!(ex && inc) && Math.abs(Math.floor(ex * 1.1) - inc) <= 2;
-// 税抜⇔税込の片方しか無いときに補完（消費税10%）。実売＝表示価格と特価の安い方
+// 消費税10%（1円未満切り捨て）。小数の誤差が出ないよう整数で計算する
+const withTax = (ex) => Math.floor(ex * 11 / 10);
+const taxOK = (ex, inc) => !!(ex && inc) && Math.abs(withTax(ex) - inc) <= 2;
+// 税込価格から税抜価格を逆算（切り捨て前の値が複数あり得るときはキリの良い方）
+function exFromIn(inc){
+  const base = Math.round(inc * 10 / 11), c = [];
+  for (let e = base - 2; e <= base + 2; e++) if (e > 0 && withTax(e) === inc) c.push(e);
+  if (!c.length) return base;
+  return c.sort((a, b) => roundness(b) - roundness(a))[0];
+}
+const roundness = (v) => v % 1000 === 0 ? 3 : v % 100 === 0 ? 2 : v % 10 === 0 ? 1 : 0;
+// 金額の「キリの良さ」から税込か税抜かを推定する。
+// 例：164,780 は 149,800×1.1 なので税込らしい ／ 298,000 は ×1.1 で作れない数なので税抜らしい
+function taxByMath(v){
+  if (!v) return null;
+  const e = exFromIn(v), inOK = withTax(e) === v, er = inOK ? roundness(e) : -1, sr = roundness(v);
+  // 税抜のキリの良い数×1.1でしか作れない端数（例：164,780）→ 税込
+  if (inOK && er >= 2 && sr <= 1) return "in";
+  // ×1.1で作れない数で、しかもキリが良い（例：298,000）→ 税抜
+  if (!inOK && sr >= 2) return "ex";
+  // 129,800 のように「税抜の値札としても、118,000の税込としても自然」な金額は決めない
+  return null;
+}
+const BASIS_LABEL = { both: "札に税抜・税込とも記載", label: "札の「税込/税抜」表示", other: "札の2つの金額の比", text: "札の「税込/税抜」の文字", math: "金額の端数から判定", only: "金額が1つだけの札（総額表示＝税込）", style: "同じ店の他の札と同じ書き方", guess: "不明（税込と仮定）", manual: "手入力" };
+const BASIS_RANK = { both: 8, manual: 8, label: 7, other: 6, text: 5, math: 4, style: 3, guess: 2, only: 1 };
+// 税抜⇔税込の片方しか無いときに補完（消費税10%）。どの値を計算で補ったかを calc に残す。実売＝表示価格と特価の安い方
 function fillTax(it){
+  it.calc = it.calc || {};
   for (const [ex, inc] of [["price_ex","price_in"],["sale_ex","sale_in"]]){
     it[ex] = toNum(it[ex]); it[inc] = toNum(it[inc]);
-    if (it[ex] && !it[inc]) it[inc] = Math.floor(it[ex] * 1.1);
-    if (it[inc] && !it[ex]) it[ex] = Math.round(it[inc] / 1.1);
+    if (it[ex] && !it[inc]){ it[inc] = withTax(it[ex]); it.calc[inc] = true; }
+    if (it[inc] && !it[ex]){ it[ex] = exFromIn(it[inc]); it.calc[ex] = true; }
   }
   const cands = [it.price_in, it.sale_in].filter(n => n);
   it.street_in = cands.length ? Math.min(...cands) : null;
@@ -728,21 +932,38 @@ function parseCluster(segs){
     const p = uniq[0];
     if (isSale){ rec.sale_ex = p.ex; rec.sale_in = p.inc; } else { rec.price_ex = p.ex; rec.price_in = p.inc; }
     confirmed = true;
+  }
+  if (confirmed){
+    rec.taxBasis = "both";
+    // この店の書き方（大きく書かれているのが税抜か税込か）を覚えておき、表示が読めない札の判断に使う
+    const ps = uniq[0], a = pc.find(x => x.v === ps.ex), b = pc.find(x => x.v === ps.inc);
+    if (a && b && Math.max(a.h, b.h) > Math.min(a.h, b.h) * 1.3) rec.bigIs = a.h > b.h ? "ex" : "in";
   } else if (pc.length){
     // 組が見つからない：一番大きく書かれた金額を採用
     pc.sort((a, b) => (b.h - a.h) || ((b.tax ? 1 : 0) - (a.tax ? 1 : 0)) || (b.v - a.v));
     const p = pc[0];
-    let tax = p.tax;
-    // 表示が読めなくても、もう1つの金額が約1.1倍（または約1/1.1）なら税抜・税込が分かる
+    // 税込か税抜かを、確かな手がかりから順に決める
+    let tax = p.tax, basis = tax ? "label" : null;
+    // ① もう1つの金額が約1.1倍（約1/1.1）なら、比で分かる（読み違いで10%ちょうどにならない場合）
     if (!tax){
-      if (pc.some(o => o !== p && Math.abs(o.v - p.v * 1.1) / p.v < 0.03)) tax = "ex";
-      else if (pc.some(o => o !== p && Math.abs(o.v - p.v / 1.1) / p.v < 0.03)) tax = "in";
+      if (pc.some(o => o !== p && Math.abs(o.v - p.v * 1.1) / p.v < 0.03)){ tax = "ex"; basis = "other"; }
+      else if (pc.some(o => o !== p && Math.abs(o.v - p.v / 1.1) / p.v < 0.03)){ tax = "in"; basis = "other"; }
     }
+    // ② 札の中に「税込」か「税抜/本体価格」のどちらか一方だけが書かれている
     if (!tax){
-      const hasIn = /税\s*込/.test(C), hasEx = /税\s*[抜別]|本体価格/.test(C);
-      tax = hasEx && !hasIn ? "ex" : "in";
-      if (!(hasIn && !hasEx)) rec.note.push("税込/税抜の表示が読めず税込として扱いました");
+      const hasIn = /税\s*込|込\s*[)）]/.test(C), hasEx = /税\s*[抜別]|本体\s*価格|[抜別]\s*[)）]/.test(C);
+      if (hasIn !== hasEx){ tax = hasIn ? "in" : "ex"; basis = "text"; }
     }
+    // ③ 金額の端数（税込は「税抜のキリの良い数×1.1」になる）
+    if (!tax){ tax = taxByMath(p.v); if (tax) basis = "math"; }
+    // ④ 札に金額が1つしか無い：総額表示の義務により税込（税抜だけの値札は出せない）
+    // 大きな金額のすぐ下・横に、小さく潰れた数字（読めなかった税込/税抜の表示）があるか
+    const near = (sg) => sg.y0 >= p.seg.y0 - p.h * 0.2 && sg.y0 <= p.seg.y1 + p.h * 2.5 && sg.x0 < p.seg.x1 + p.h * 2 && sg.x1 > p.seg.x0 - p.h;
+    const hasOther = pc.some(o => o !== p && near(o.seg)) || segs.some(sg => sg !== p.seg && near(sg) && sg.h < p.h * 0.8 && /\d{2,3}[,.]\d|\d{4,}/.test(sg.c));
+    if (!tax && !hasOther){ tax = "in"; basis = "only"; }
+    // ⑤ 分からない（小さな金額が読めていない）：いったん税込と仮定し、後で同じ写真の他の札の書き方に合わせ直す
+    if (!tax){ tax = "in"; basis = "guess"; }
+    rec.taxBasis = basis; rec.single = { v: p.v, h: p.h, rel: p.h / Math.max(1, maxH), hasOther };
     const k = isSale ? "sale" : "price";
     rec[k + (tax === "ex" ? "_ex" : "_in")] = p.v;
     if (p.glued) { rec.note.push("金額の先頭の数字が欠けているかもしれません"); rec.suspect = true; }
@@ -751,7 +972,7 @@ function parseCluster(segs){
   }
   const hasPrice = !!(rec.price_ex || rec.price_in || rec.sale_ex || rec.sale_in);
   const goodModel = rec.model && rec.modelScore >= 4;
-  rec.confidence = (goodModel && confirmed) ? "high" : (goodModel && hasPrice && pc.length && pc[0].tax && !rec.suspect) ? "medium" : "low";
+  rec.confidence = (goodModel && confirmed) ? "high" : (goodModel && hasPrice && pc.length && (BASIS_RANK[rec.taxBasis] >= 4 || rec.taxBasis === "only") && !rec.suspect) ? "medium" : "low";
   if (!rec.model) rec.note.push("型番が読めませんでした");
   if (!hasPrice) rec.note.push("価格が読めませんでした");
   rec.hasPrice = hasPrice; rec.confirmed = confirmed;
@@ -852,11 +1073,21 @@ function mergeRecords(recs, ctx){
       const it2 = tagReads.length ? tagReads : it;
       const conf = it2.filter(x => taxOK(x[exF], x[inF]));
       // 札ごとに拡大して読んだ結果は2票、写真全体をまとめて読んだ結果は1票
-      if (conf.length){ const t = tally(conf.flatMap(x => x.src === "W" ? [x[exF] + "|" + x[inF]] : [x[exF] + "|" + x[inF], x[exF] + "|" + x[inF]]))[0][0].split("|"); return { ex: +t[0], inc: +t[1], ok: true }; }
-      const pool = it2.filter(x => !x.suspect && (x[exF] || x[inF])).length ? it2.filter(x => !x.suspect) : it2;
-      const ex = tally(pool.map(x => x[exF]))[0], inc = tally(pool.map(x => x[inF]))[0];
-      if (!ex && !inc) return null;
-      return { ex: ex ? ex[0] : null, inc: inc ? inc[0] : null, ok: false };
+      if (conf.length){ const t = tally(conf.flatMap(x => x.src === "W" ? [x[exF] + "|" + x[inF]] : [x[exF] + "|" + x[inF], x[exF] + "|" + x[inF]]))[0][0].split("|"); return { ex: +t[0], inc: +t[1], ok: true, basis: "both" }; }
+      // 金額が1つしか読めていない読み：まず金額を多数決し、税込/税抜は一番確かな根拠の読みに従う
+      const pool0 = it2.filter(x => (x[exF] || x[inF]) && !(x[exF] && x[inF]));
+      const pool = pool0.filter(x => !x.suspect).length ? pool0.filter(x => !x.suspect) : pool0;
+      if (!pool.length) return null;
+      const val = (x) => x[exF] || x[inF];
+      const v = tally(pool.flatMap(x => x.src === "W" ? [val(x)] : [val(x), val(x)]))[0][0];
+      const same = pool.filter(x => val(x) === v).sort((a, b) => (BASIS_RANK[b.taxBasis] || 0) - (BASIS_RANK[a.taxBasis] || 0));
+      // 「金額が1つだけ」と「小さな数字が潰れている」が食い違うときは、多い方を採る
+      const nOnly = same.filter(x => x.taxBasis === "only").length, nGuess = same.filter(x => x.taxBasis === "guess").length;
+      if (same[0].taxBasis === "guess" && nOnly >= nGuess) same.sort((a, b) => (a.taxBasis === "only" ? -1 : 0) - (b.taxBasis === "only" ? -1 : 0));
+      const topRank = BASIS_RANK[same[0].taxBasis] || 0;
+      const votes = tally(same.filter(x => (BASIS_RANK[x.taxBasis] || 0) === topRank).map(x => x[exF] ? "ex" : "in"));
+      const tax = votes[0][0];
+      return { ex: tax === "ex" ? v : null, inc: tax === "in" ? v : null, ok: false, basis: same[0].taxBasis || "guess", single: same[0].single };
     };
     let reg = pick("price_ex", "price_in"); const sal = pick("sale_ex", "sale_in");
     if (reg && sal && (reg.inc && reg.inc === sal.inc || reg.ex && reg.ex === sal.ex)) reg = null;
@@ -878,9 +1109,11 @@ function mergeRecords(recs, ctx){
     if (!model || (!reg && !sal)) confidence = "low";
     if (models.length > 1) notes.push("型番の読み：" + models.map(([m, c]) => `${m}×${c}`).join("、"));
     const bestNotes = best.note || [];
-    if (reg && reg.ok || sal && sal.ok) notes.push(...bestNotes.filter(n => !/税込として|価格が読め|合いません/.test(n)));
+    if (reg && reg.ok || sal && sal.ok) notes.push(...bestNotes.filter(n => !/価格が読め|合いません/.test(n)));
     else notes.push(...bestNotes);
+    const basis = [reg, sal].filter(Boolean).sort((a, b) => (BASIS_RANK[b.basis] || 0) - (BASIS_RANK[a.basis] || 0)).map(x => x.basis)[0] || "";
     out.push(fillTax({
+      taxBasis: basis, single: (reg && reg.single) || (sal && sal.single) || null,
       category: ctx.category || top("category"), maker: top("maker"), model,
       spec: it.map(x => x.spec || "").sort((a, b) => b.length - a.length)[0] || "",
       price_ex: reg ? reg.ex : null, price_in: reg ? reg.inc : null, sale_ex: sal ? sal.ex : null, sale_in: sal ? sal.inc : null,
@@ -898,6 +1131,27 @@ function mergeRecords(recs, ctx){
   const frag = (r, o) => { const a = fuzzyKey(r.model), b = fuzzyKey(o.model); return a !== b && (b.includes(a) || editDist(a, b) <= 2); };
   res = res.filter(r => !r.model || !res.some(o => o !== r && o.model && o.street_in && overlap(o.box, r.box) > 0.2 && frag(r, o) &&
     (RANK[o.confidence] || 4) >= (RANK[r.confidence] || 4) && (o.mscore >= r.mscore || !r.street_in)));
+  // 税込/税抜が分からなかった札は、同じ写真（同じ店）の他の札の書き方に合わせる
+  const styles = tally(recs.map(r => r.bigIs).filter(Boolean));
+  let style = styles.length && (styles.length === 1 || styles[0][1] >= styles[1][1] * 2) ? styles[0][0] : null;
+  let styleFrom = "style";
+  if (!style && ctx.competitor){ try { style = (JSON.parse(load(STYLE_KEY) || "{}"))[ctx.competitor] || null; } catch(e){} }
+  if (style && ctx.competitor && styles.length){ try { const m = JSON.parse(load(STYLE_KEY) || "{}"); m[ctx.competitor] = style; store(STYLE_KEY, m); } catch(e){} }
+  for (const r of res){
+    if (r.taxBasis !== "guess") continue;
+    if (style && (!r.single || r.single.rel >= 0.7)){
+      for (const [ex, inc] of [["price_ex", "price_in"], ["sale_ex", "sale_in"]]){
+        const v = r.calc[ex] ? r[inc] : r.calc[inc] ? r[ex] : null; if (!v) continue;
+        r[ex] = null; r[inc] = null; r.calc = {};
+        if (style === "ex") r[ex] = v; else r[inc] = v;
+      }
+      fillTax(r); r.taxBasis = styleFrom;
+      r.note = [r.note, `大きく書かれた金額をこの店の書き方（${style === "ex" ? "税抜" : "税込"}）に合わせました`].filter(Boolean).join("／");
+    } else {
+      r.note = [r.note, "税込か税抜か判別できず、税込と仮定しました。札で確認してください"].filter(Boolean).join("／");
+      if (r.confidence !== "low") r.confidence = "low";
+    }
+  }
   return res.sort((a, b) => (!a.model) - (!b.model) || (a.box && b.box ? a.box.y0 - b.box.y0 : 0));
 }
 
@@ -1059,9 +1313,11 @@ function filesFromDrop(dt){
   if (!fs.length && dt.items) fs = [...dt.items].filter(i => i.kind === "file").map(i => i.getAsFile()).filter(Boolean);
   return fs;
 }
+function markThumbsShown(){ state.photos.forEach(p => p.thumbShown = true); }
 function renderThumbs(){
+  setTimeout(markThumbsShown, 600);
   $("thumbs").innerHTML = state.photos.map(p => `
-    <div class="thumb"><img src="${p.url}" alt="${esc(p.name)}">
+    <div class="thumb"${p.thumbShown ? ' style="animation:none"' : ""}><img src="${p.url}" alt="${esc(p.name)}">
       <span class="st">${esc(p.status)}</span>
       <button data-rm="${p.id}" aria-label="${esc(p.name)} を外す" ${state.busy ? "disabled" : ""}>×</button></div>`).join("");
 }
@@ -1112,7 +1368,8 @@ function renderResults(){
       body = `<b>${p.added}件</b>を台帳に追加しました。${p.review ? `<span style="color:var(--bad)">要確認 ${p.review}件</span>は台帳の赤い行です。写真と見比べてセルをクリックして直してください。` : ""}
         ${miss ? `<div>札らしいのに読めなかった所が${miss}か所あります（写真の赤枠）。</div>` : ""}<div class="pb-acts">${openBtn}</div>`;
     }
-    return `<div class="photo-block"><div class="pb-head"><img src="${p.url}" alt="${esc(p.name)}を開く" data-open="${p.id}">
+    const first = !p.blockShown; p.blockShown = true;
+    return `<div class="photo-block"${first ? "" : ' style="animation:none"'}><div class="pb-head"><img src="${p.url}" alt="${esc(p.name)}を開く" data-open="${p.id}">
       <div class="t"><div><b>${esc(p.name)}</b> <span class="small muted">${p.img.naturalWidth}×${p.img.naturalHeight}px</span></div>
       <div class="small">${body}</div></div></div></div>`;
   }).join("");
@@ -1136,12 +1393,12 @@ function drawViewer(){
   const lw = Math.max(2, c.width / 400);
   g.lineWidth = lw;
   const rows = state.ledger.filter(r => r.photoId === p.id && r.box);
-  g.strokeStyle = "#3ddc84";
+  g.strokeStyle = "#30d158";
   for (const r of rows){ const b = r.box; g.strokeRect(b.x0 * s, b.y0 * s, (b.x1 - b.x0) * s, (b.y1 - b.y0) * s); }
-  g.strokeStyle = "#ff6b6b"; g.setLineDash([lw * 3, lw * 2]);
+  g.strokeStyle = "#ff453a"; g.setLineDash([lw * 3, lw * 2]);
   for (const r of (p.regions || [])) if (!r.ok) g.strokeRect(r.x * s, r.y * s, r.w * s, r.h * s);
   g.setLineDash([]);
-  if (view.sel){ const b = view.sel; g.strokeStyle = "#ffd83a"; g.lineWidth = lw * 1.5; g.fillStyle = "rgba(255,216,58,.15)";
+  if (view.sel){ const b = view.sel; g.strokeStyle = "#2997ff"; g.lineWidth = lw * 1.5; g.fillStyle = "rgba(41,151,255,.18)";
     g.fillRect(b.x * s, b.y * s, b.w * s, b.h * s); g.strokeRect(b.x * s, b.y * s, b.w * s, b.h * s); }
 }
 function evPos(e){ const c = $("vCanvas"), r = c.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * c.width / view.scale, y: (e.clientY - r.top) / r.height * c.height / view.scale }; }
@@ -1185,12 +1442,14 @@ $("vRead").addEventListener("click", async () => {
 });
 
 /* ================= 台帳 ================= */
-function saveLedger(){ store(STORE_KEY, state.ledger); }
+// 台帳は開いている間だけ持つ（毎回まっさらな状態から始めるため、端末には保存しない）
+function saveLedger(){}
 function toRow(p, r, ctx){
   return { id: uid(), date: ctx.date, competitor: ctx.competitor, store: ctx.store, photo: p ? p.name : "", photoId: p ? p.id : "",
     category: r.category || "", maker: r.maker || "", model: r.model || "", name: r.name || "", year: r.year || "", spec: r.spec || "",
     price_ex: r.price_ex ?? null, price_in: r.price_in ?? null, sale_ex: r.sale_ex ?? null, sale_in: r.sale_in ?? null, street_in: r.street_in ?? null,
     sale_period: r.sale_period || "", install: r.install || "", warranty: r.warranty || "", perks: r.perks || "", note: r.note || "",
+    taxBasis: r.taxBasis || (r.price_ex || r.price_in || r.sale_ex || r.sale_in ? "" : ""), calc: { ...(r.calc || {}) },
     confidence: r.confidence || "medium", reads: r.reads || 1, box: r.box || null, manual: !!r.manual, createdAt: new Date().toISOString() };
 }
 // 自動読み取りの結果で、その写真の自動行を置き換える（囲んで読んだ行・手で直した行は残す）
@@ -1220,18 +1479,26 @@ function filtered(){
 }
 const CONF_LABEL = { high:"高", medium:"中", low:"低", ok:"確認済" };
 const isMoney = (f) => /_(in|ex)$/.test(f);
-const ed = (r, f, cls = "") => `<td class="ed ${cls}" contenteditable="true" spellcheck="false" data-id="${r.id}" data-f="${f}">${isMoney(f) ? (r[f] ? Number(r[f]).toLocaleString("ja-JP") : "") : esc(r[f])}</td>`;
+const ed = (r, f, cls = "") => `<td class="ed ${cls}${isMoney(f) && r.calc && r.calc[f] && r[f] ? " calc" : ""}" contenteditable="true" spellcheck="false" data-id="${r.id}" data-f="${f}" ${isMoney(f) && r.calc && r.calc[f] ? 'title="札には書かれておらず、もう一方の金額から消費税10%で計算した値"' : ""}>${isMoney(f) ? (r[f] ? Number(r[f]).toLocaleString("ja-JP") : "") : esc(r[f])}</td>`;
+const isWeakBasis = (b) => b === "guess" || b === "style" || b === "math" || b === "only";
+const basisCell = (r) => { const b = r.taxBasis; if (!b && !(r.price_in || r.sale_in)) return `<td class="basis" data-cell="basis"></td>`;
+  return `<td class="basis${isWeakBasis(b) ? " weak" : ""}" data-cell="basis" title="${isWeakBasis(b) ? "札の表示からは確定できず推定しました。違う場合は「税抜⇔税込」で入れ替えられます" : "札の表示から確定"}">${isWeakBasis(b) ? "推定：" : "確定："}${esc(BASIS_LABEL[b] || "—")}</td>`; };
+const canSwap = (r) => !!(r.calc && (r.calc.price_ex || r.calc.price_in || r.calc.sale_ex || r.calc.sale_in));
 function rowHTML(r){
   const hasPhoto = state.photos.some(p => p.id === r.photoId);
-  return `<tr data-id="${r.id}" class="${r.confidence === "low" ? "lowrow" : ""}">
+  // 新しく入った行だけ、ふわっと色を付けて知らせる
+  const fk = (r.photoId || "") + "|" + fuzzyKey(r.model) + "|" + (r.street_in || "");
+  const fresh = state.seen && !state.seen.has(fk); if (state.seen) state.seen.add(fk);
+  return `<tr data-id="${r.id}" class="${r.confidence === "low" ? "lowrow" : ""}${fresh ? " fresh" : ""}">
     ${ed(r, "date", "num")}${ed(r, "competitor")}${ed(r, "store")}${ed(r, "category")}
     ${ed(r, "maker")}${ed(r, "model", "num")}${ed(r, "spec")}
-    ${ed(r, "price_in", "r num")}${ed(r, "sale_in", "r num")}
+    ${ed(r, "price_ex", "r num")}${ed(r, "price_in", "r num")}${ed(r, "sale_ex", "r num")}${ed(r, "sale_in", "r num")}
     <td class="r" data-cell="street">${r.street_in ? `<span class="price-tag">${yen(r.street_in)}</span>` : ""}</td>
+    ${basisCell(r)}
     ${ed(r, "sale_period")}${ed(r, "warranty", "small")}${ed(r, "perks", "small")}
     ${ed(r, "note", "small")}
     <td data-cell="conf"><span class="conf ${esc(r.confidence)}">${CONF_LABEL[r.confidence] || "中"}</span></td>
-    <td class="acts">${hasPhoto ? `<button data-photo="${r.photoId}">写真</button>` : ""}<button data-ok="${r.id}" title="確認済みにする">✓</button><button data-ldel="${r.id}" aria-label="削除">削除</button></td></tr>`;
+    <td class="acts">${hasPhoto ? `<button data-photo="${r.photoId}">写真</button>` : ""}${canSwap(r) ? `<button data-swap="${r.id}" title="読み取った金額を、税抜⇔税込の反対として扱い直す">税抜⇔税込</button>` : ""}<button data-ok="${r.id}" title="確認済みにする">✓</button><button data-ldel="${r.id}" aria-label="削除">削除</button></td></tr>`;
 }
 function renderStats(rows){
   const lowN = rows.filter(r => r.confidence === "low").length;
@@ -1240,13 +1507,17 @@ function renderStats(rows){
 function renderLedger(){
   const comps = [...new Set(state.ledger.map(r => r.competitor).filter(Boolean))];
   const cur = $("fComp").value;
-  $("fComp").innerHTML = `<option value="">全競合店</option>` + comps.map(c => `<option ${c === cur ? "selected" : ""}>${esc(c)}</option>`).join("");
+  $("fComp").innerHTML = `<option value="">すべての競合店</option>` + comps.map(c => `<option ${c === cur ? "selected" : ""}>${esc(c)}</option>`).join("");
   const rows = filtered().slice().sort((a, b) => (b.createdAt || "").slice(0, 16).localeCompare((a.createdAt || "").slice(0, 16)) || (a.photo || "").localeCompare(b.photo || "") || ((a.box && b.box) ? a.box.y0 - b.box.y0 : 0));
   renderStats(rows);
   $("ledgerBody").innerHTML = rows.length ? rows.map(rowHTML).join("")
-    : `<tr><td colspan="16" class="muted" style="text-align:center;padding:24px">まだ登録がありません。写真を読み取るか「手入力で行を追加」で入れてください。</td></tr>`;
+    : `<tr><td colspan="20" class="muted" style="text-align:center;padding:24px">まだ登録がありません。写真を読み取るか「手入力で行を追加」で入れてください。</td></tr>`;
 }
 function refreshRow(tr, r){
+  if (!tr) return;
+  // 金額は相互に計算されるので行ごと描き直す
+  const nt = document.createElement("tbody"); nt.innerHTML = rowHTML(r); const nr = nt.firstElementChild;
+  tr.replaceWith(nr); tr = nr;
   tr.classList.toggle("lowrow", r.confidence === "low");
   tr.querySelector('[data-cell="street"]').innerHTML = r.street_in ? `<span class="price-tag">${yen(r.street_in)}</span>` : "";
   tr.querySelector('[data-cell="conf"]').innerHTML = `<span class="conf ${esc(r.confidence)}">${CONF_LABEL[r.confidence] || "中"}</span>`;
@@ -1256,17 +1527,30 @@ function editCell(td){
   const r = state.ledger.find(x => x.id === td.dataset.id); if (!r) return;
   const f = td.dataset.f, raw = td.textContent.trim();
   if (isMoney(f)){
-    const v = toNum(raw), exF = f.replace("_in", "_ex");
-    if (v === r[f]) return;
-    r[f] = v; r[exF] = null;
+    const v = toNum(raw), other = f.endsWith("_in") ? f.replace("_in", "_ex") : f.replace("_ex", "_in");
+    if (v === r[f] && !(r.calc && r.calc[f])) return;
+    r.calc = r.calc || {};
+    // 入力した方を「札の値」とし、もう一方は消費税10%で計算し直す（両方を手で入れた場合はそのまま）
+    r[f] = v; r.calc[f] = false;
+    if (r.calc[other] !== false || !r[other] || !taxOK(f.endsWith("_ex") ? v : r[other], f.endsWith("_ex") ? r[other] : v)){ r[other] = null; r.calc[other] = false; }
     fillTax(r);
-    td.textContent = r[f] ? r[f].toLocaleString("ja-JP") : "";
+    r.taxBasis = "manual";
   } else {
     if (raw === (r[f] || "")) return;
     r[f] = raw;
   }
   if (f !== "note") r.confidence = "ok";
   saveLedger(); refreshRow(td.closest("tr"), r);
+}
+// 1つしか読めなかった金額を、税抜⇔税込の反対として扱い直す
+function swapTax(r){
+  r.calc = r.calc || {};
+  for (const [ex, inc] of [["price_ex", "price_in"], ["sale_ex", "sale_in"]]){
+    if (r.calc[ex] && r[inc]){ const v = r[inc]; r[inc] = null; r[ex] = v; r.calc = { ...r.calc, [ex]: false, [inc]: false }; }
+    else if (r.calc[inc] && r[ex]){ const v = r[ex]; r[ex] = null; r[inc] = v; r.calc = { ...r.calc, [ex]: false, [inc]: false }; }
+  }
+  fillTax(r); r.taxBasis = "manual"; r.confidence = "ok";
+  r.note = String(r.note || "").split("／").filter(n => !/税込か税抜か|税込と仮定|書き方/.test(n)).join("／");
 }
 function addManualRow(){
   const ctx = ctxNow();
@@ -1280,11 +1564,14 @@ function addManualRow(){
 /* ================= 書き出し ================= */
 const CSV_COLS = [["date","調査日"],["competitor","競合店"],["store","店舗"],["category","カテゴリ"],["maker","メーカー"],["model","型番"],["name","商品名・シリーズ"],["year","年式"],["spec","主要スペック"],
   ["price_ex","表示価格(税抜)"],["price_in","表示価格(税込)"],["sale_ex","特価(税抜)"],["sale_in","特価(税込)"],["street_in","実売価格(税込)"],["sale_period","特価期間"],
+  ["taxBasisLabel","税込/税抜の根拠"],["calcLabel","計算で補った金額"],
   ["install","工事費"],["warranty","保証"],["perks","特典・POP"],["note","備考"],["confidence","信頼度"],["photo","写真ファイル"]];
+const MONEY_JA = { price_ex: "表示価格(税抜)", price_in: "表示価格(税込)", sale_ex: "特価(税抜)", sale_in: "特価(税込)" };
+const exportRow = (r) => ({ ...r, taxBasisLabel: BASIS_LABEL[r.taxBasis] || "", calcLabel: Object.keys(MONEY_JA).filter(k => r.calc && r.calc[k] && r[k]).map(k => MONEY_JA[k]).join("、") });
 const CONF_JA = { high:"高", medium:"中", low:"低", ok:"確認済" };
 function toCSV(rows){
   const q = v => { const s = v == null ? "" : String(v); return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s; };
-  return "﻿" + [CSV_COLS.map(c => c[1]).join(","), ...rows.map(r => CSV_COLS.map(([k]) => q(k === "confidence" ? CONF_JA[r[k]] : r[k])).join(","))].join("\r\n");
+  return "﻿" + [CSV_COLS.map(c => c[1]).join(","), ...rows.map(exportRow).map(r => CSV_COLS.map(([k]) => q(k === "confidence" ? CONF_JA[r[k]] : r[k])).join(","))].join("\r\n");
 }
 async function saveFile(filename, data, mime){
   if (state.downloads){
@@ -1316,11 +1603,14 @@ async function buildWorkbook(rows){
   const wb = new ExcelJS.Workbook();
   wb.creator = "競合価格調査シート"; wb.created = new Date();
   const ws = wb.addWorksheet("調査台帳");
-  const widths = { date:11, competitor:13, store:12, category:11, maker:10, model:18, name:20, year:12, spec:22, price_ex:13, price_in:13, sale_ex:13, sale_in:13, street_in:14, sale_period:18, install:14, warranty:14, perks:24, note:18, confidence:8, photo:18 };
+  const widths = { date:11, competitor:13, store:12, category:11, maker:10, model:18, name:20, year:12, spec:22, price_ex:13, price_in:13, sale_ex:13, sale_in:13, street_in:14, sale_period:18, install:14, warranty:14, perks:24, note:18, confidence:8, photo:18, taxBasisLabel:22, calcLabel:20 };
   ws.columns = CSV_COLS.map(([k,l]) => ({ header:l, key:k, width: widths[k] || 12 }));
   const money = ["price_ex","price_in","sale_ex","sale_in","street_in"];
   rows.forEach((r, i) => {
-    const row = ws.addRow({ ...r, date: r.date ? new Date(r.date + "T00:00:00") : "", confidence: CONF_JA[r.confidence] || "中" });
+    const row = ws.addRow({ ...exportRow(r), date: r.date ? new Date(r.date + "T00:00:00") : "", confidence: CONF_JA[r.confidence] || "中" });
+    // 札に書かれておらず計算で補った金額は、灰色の斜体にする
+    for (const k of Object.keys(MONEY_JA)) if (r.calc && r.calc[k] && r[k]) row.getCell(k).font = { italic: true, color: { argb: "FF7A8494" } };
+    if (isWeakBasis(r.taxBasis)) row.getCell("taxBasisLabel").font = { bold: true, color: { argb: "FFB3261E" } };
     money.forEach(k => { const c = row.getCell(k); c.numFmt = YEN_FMT; c.alignment = { horizontal:"right" }; });
     row.getCell("date").numFmt = "yyyy/mm/dd";
     row.getCell("street_in").font = { bold:true };
@@ -1363,7 +1653,8 @@ async function buildWorkbook(rows){
   info.columns = [{ header:"項目", key:"k", width:16 }, { header:"内容", key:"v", width:48 }];
   [["出力日時", new Date().toLocaleString("ja-JP")], ["件数", rows.length], ["競合店", comps.join("、")],
    ["絞り込み", [$("fCat").value || "全カテゴリ", $("fComp").value || "全競合店", $("fText").value].filter(Boolean).join(" / ")],
-   ["実売価格", "表示価格(税込)と特価(税込)の安い方"], ["信頼度「低」", "調査台帳シートで薄い赤の行。写真で確認してください"]
+   ["実売価格", "表示価格(税込)と特価(税込)の安い方"], ["灰色の斜体の金額", "札に書かれておらず、もう一方の金額から消費税10%（1円未満切り捨て）で計算した値"],
+   ["税込/税抜の根拠（赤字）", "札の表示から確定できなかったもの。札で確認してください"], ["信頼度「低」", "調査台帳シートで薄い赤の行。写真で確認してください"]
   ].forEach(([k,v]) => info.addRow({ k, v }));
   styleHeader(info); info.autoFilter = undefined; borderAll(info);
   return wb;
@@ -1415,6 +1706,7 @@ $("results").addEventListener("click", e => {
 $("ledgerBody").addEventListener("click", e => {
   const t = e.target;
   if (t.dataset.photo) openViewer(t.dataset.photo);
+  if (t.dataset.swap){ const r = state.ledger.find(x => x.id === t.dataset.swap); if (r){ swapTax(r); saveLedger(); refreshRow(t.closest("tr"), r); } return; }
   if (t.dataset.ok){ const r = state.ledger.find(x => x.id === t.dataset.ok); if (r){ r.confidence = "ok"; saveLedger(); refreshRow(t.closest("tr"), r); } }
   if (t.dataset.ldel){ state.ledger = state.ledger.filter(r => r.id !== t.dataset.ldel); saveLedger(); renderLedger();
     state.photos.forEach(p => { const mine = state.ledger.filter(r => r.photoId === p.id); p.added = mine.length; p.review = mine.filter(r => r.confidence === "low").length; }); renderResults(); }
@@ -1442,17 +1734,87 @@ $("clearBtn").addEventListener("click", () => {
   $("clearYes").onclick = () => { state.ledger = []; saveLedger(); renderLedger(); resetClear(); toast("台帳を削除しました"); };
 });
 function resetClear(){ $("clearArea").innerHTML = `<button class="link" id="clearBtn2">台帳をすべて削除</button>`; $("clearBtn2").onclick = () => $("clearBtn").click(); }
-$("competitor").addEventListener("change", () => store("cps-competitor", $("competitor").value));
-$("store").addEventListener("change", () => store("cps-store", $("store").value));
+// ---- データのリセット
+function oldLedgerCount(){ let n = 0; for (const k of OLD_KEYS){ try { const a = JSON.parse(load(k) || "null"); if (Array.isArray(a)) n += a.filter(r => r && !r.example).length; } catch(e){} } return n; }
+function openReset(){
+  const items = [`調査台帳 ${state.ledger.length}件`, `読み込んだ写真 ${state.photos.length}枚`, "店ごとに覚えた税込/税抜の書き方", "入力中の競合店名・店舗名"];
+  const old = oldLedgerCount(); if (old) items.splice(1, 0, `以前の版のデータ ${old}件`);
+  $("resetList").innerHTML = items.map(t => `<li>${esc(t)}</li>`).join("");
+  $("resetKeepShop").checked = false;
+  $("resetDlg").hidden = false; $("resetNo").focus();
+}
+function doReset(){
+  const keepShop = $("resetKeepShop").checked;
+  if (ctl) try { ctl.abort(); } catch(e){}
+  for (const k of ALL_KEYS()){ if (keepShop && (k === "cps-competitor" || k === "cps-store")) continue; try { localStorage.removeItem(k); } catch(e){} }
+  state.photos.forEach(p => { try { if (String(p.url).startsWith("blob:")) URL.revokeObjectURL(p.url); } catch(e){} });
+  state.ledger = []; state.photos = []; state.busy = false;
+  if (!keepShop){ $("competitor").value = ""; $("store").value = ""; }
+  $("category").value = ""; ["fCat", "fComp", "fText"].forEach(id => $(id).value = "");
+  $("resetDlg").hidden = true; $("viewer").hidden = true; renderOldNote();
+  renderThumbs(); renderResults(); renderLedger(); updateRun();
+  toast("データをリセットしました");
+}
+$("resetBtn").addEventListener("click", openReset);
+$("resetNo").addEventListener("click", () => $("resetDlg").hidden = true);
+$("resetYes").addEventListener("click", doReset);
+$("resetDlg").addEventListener("click", e => { if (e.target === $("resetDlg")) $("resetDlg").hidden = true; });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("resetDlg").hidden) $("resetDlg").hidden = true; });
+// 以前の版で保存されていた台帳は自動では出さず、読み込むか消すかを選べるようにする
+function renderOldNote(){
+  const n = oldLedgerCount(), box = $("oldNote");
+  if (!n){ box.hidden = true; return; }
+  box.hidden = false;
+  box.innerHTML = `<span>以前の版で保存された台帳が<b>${n}件</b>この端末に残っています（今の台帳には入れていません）。</span><button id="oldLoad">台帳に読み込む</button><button id="oldDel" class="danger">削除する</button>`;
+  $("oldLoad").onclick = () => {
+    let add = [];
+    for (const k of OLD_KEYS){ try { const a = JSON.parse(load(k) || "null"); if (Array.isArray(a)) add = add.concat(a.filter(r => r && r.id && !r.example)); } catch(e){} }
+    const ids = new Set(state.ledger.map(r => r.id)); add = add.filter(r => !ids.has(r.id)).map(r => ({ ...r, calc: r.calc || {}, taxBasis: r.taxBasis || "" }));
+    state.ledger = state.ledger.concat(add); saveLedger();
+    OLD_KEYS.forEach(k => { try { localStorage.removeItem(k); } catch(e){} });
+    renderOldNote(); renderLedger(); toast(`${add.length}件を読み込みました`);
+  };
+  $("oldDel").onclick = () => { OLD_KEYS.forEach(k => { try { localStorage.removeItem(k); } catch(e){} }); renderOldNote(); toast("以前の版のデータを削除しました"); };
+}
+// 台帳に行がある状態でページを閉じようとしたら確認する（閉じると台帳は消えるため）
+window.addEventListener("beforeunload", e => { if (state.ledger.length){ e.preventDefault(); e.returnValue = ""; } });
+
+/* ================= 読み取りの細かさ（セグメント） ================= */
+const SEG_DESC = { "1": "見つけた値札だけを読みます。近くから撮った写真向け。", "2": "値札に加えて写真全体も読み、読めなかった所は拡大して読み直します。", "3": "すべての札を3通りの補正で読み、さらに細かく読み直します。時間は標準の2〜3倍です。" };
+function setSeg(v, focus){
+  $("density").value = v;
+  const btns = [...$("seg").querySelectorAll("button")], i = btns.findIndex(b => b.dataset.v === v);
+  btns.forEach((b, k) => { b.setAttribute("aria-checked", k === i ? "true" : "false"); b.tabIndex = k === i ? 0 : -1; });
+  $("seg").querySelector(".thumb-bg").style.transform = `translateX(${i * 100}%)`;
+  const d = $("segDesc"); d.style.opacity = 0; setTimeout(() => { d.textContent = SEG_DESC[v]; d.style.opacity = 1; }, 120);
+  if (focus) btns[i].focus();
+}
+function initSeg(){
+  const seg = $("seg");
+  seg.addEventListener("click", e => { const b = e.target.closest("button[data-v]"); if (b) setSeg(b.dataset.v); });
+  seg.addEventListener("keydown", e => {
+    const order = ["1", "2", "3"], i = order.indexOf($("density").value);
+    if (e.key === "ArrowRight" || e.key === "ArrowDown"){ e.preventDefault(); setSeg(order[Math.min(2, i + 1)], true); }
+    if (e.key === "ArrowLeft" || e.key === "ArrowUp"){ e.preventDefault(); setSeg(order[Math.max(0, i - 1)], true); }
+  });
+  setSeg("2");
+  $("segDesc").textContent = SEG_DESC[$("density").value]; $("segDesc").style.opacity = 1;
+}
 
 /* ================= 起動 ================= */
 (function boot(){
   const sel = $("category"), fc = $("fCat");
   CATS.forEach(c => { sel.add(new Option(c, c)); fc.add(new Option(c, c)); });
   const d = new Date(); $("surveyDate").value = new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString().slice(0,10);
-  $("competitor").value = load("cps-competitor") || ""; $("store").value = load("cps-store") || "";
-  try { const s = JSON.parse(load(STORE_KEY) || "null"); if (Array.isArray(s)) state.ledger = s.filter(r => !r.example); } catch(e){}
-  renderThumbs(); renderResults(); renderLedger(); updateRun();
+  // 毎回リセットした状態から始める：以前の版も含め、この端末に残っている台帳・入力・設定をすべて消す
+  for (const k of ALL_KEYS()){ try { localStorage.removeItem(k); } catch(e){} }
+  try { for (let i = localStorage.length - 1; i >= 0; i--){ const k = localStorage.key(i); if (/^(competitor-price-survey|cps-)/.test(k)) localStorage.removeItem(k); } } catch(e){}
+  state.ledger = []; state.photos = [];
+  $("competitor").value = ""; $("store").value = ""; $("category").value = ""; ["fCat", "fComp", "fText"].forEach(id => $(id).value = "");
+  renderThumbs(); renderResults(); renderLedger(); updateRun(); renderOldNote();
+  // 起動時にすでにある行は「新しい行」として光らせない
+  state.seen = new Set(state.ledger.map(r => (r.photoId || "") + "|" + fuzzyKey(r.model) + "|" + (r.street_in || "")));
+  initSeg();
   // claude.ai の中で開いたときは保存ダイアログを使う（無ければ通常のダウンロード）
   if (window.claude && typeof window.claude.use === "function") window.claude.use("downloads").then(d => state.downloads = d).catch(() => {});
 })();
